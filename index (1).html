@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>씨엔브이텍 고객관리 · CVT CRM</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#10262E; --ink-2:#2B4750;
+  --teal:#0E7C86; --teal-600:#0B6670; --teal-tint:#E5F2F3;
+  --bg:#F1F4F4; --card:#FFFFFF; --line:#E1E8E9; --line-2:#EDF1F1;
+  --muted:#5C7079; --muted-2:#8B9BA2;
+  --amber:#A9640F; --amber-tint:#FAF0DD;
+  --ok:#0C9466; --ok-tint:#E2F4EC;
+  --warn:#BE2E1C; --warn-tint:#FBE6E2;
+  --violet:#654AB8; --violet-tint:#EDE9F7;
+  --gray:#5E7079; --gray-tint:#EBEEEF;
+  --sans:'Pretendard','Pretendard Variable',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular','SF Mono',Consolas,'Liberation Mono',monospace;
+  --shadow:0 1px 2px rgba(16,38,46,.04),0 4px 16px rgba(16,38,46,.06);
+  --shadow-lg:0 8px 40px rgba(16,38,46,.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+::selection{background:var(--teal-tint)}
+
+/* ---------- layout ---------- */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.side{background:var(--ink);color:#CFE0E2;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand .mark{display:inline-flex;align-items:center;gap:8px}
+.brand .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;background:var(--teal);color:#fff;padding:3px 7px;border-radius:5px;font-weight:600}
+.brand .co{font-weight:700;color:#fff;font-size:15px;letter-spacing:-.01em;margin-top:10px}
+.brand .sub{font-size:11px;color:#7FA0A5;margin-top:2px;letter-spacing:.02em}
+.nav{padding:12px 12px;display:flex;flex-direction:column;gap:2px;flex:1}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:#B7CED0;text-decoration:none;font-size:13.5px;font-weight:500;transition:.12s}
+.nav a:hover{background:rgba(255,255,255,.05);color:#fff}
+.nav a.on{background:var(--teal);color:#fff}
+.nav a .ic{width:18px;height:18px;flex:none;opacity:.9}
+.nav a .badge{margin-left:auto;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.12);color:#DDECEE;padding:1px 7px;border-radius:20px}
+.nav a.on .badge{background:rgba(255,255,255,.22)}
+.side .foot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#6C8B90;line-height:1.6}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;background:rgba(241,244,244,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:16px}
+.search{position:relative;flex:1;max-width:560px}
+.search input{width:100%;height:42px;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:0 14px 0 42px;font-size:14px;color:var(--ink);transition:.15s;box-shadow:var(--shadow)}
+.search input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-tint)}
+.search .si{position:absolute;left:14px;top:12px;color:var(--muted-2)}
+.search .hint{position:absolute;right:12px;top:11px;font-family:var(--mono);font-size:11px;color:var(--muted-2);border:1px solid var(--line);padding:2px 6px;border-radius:5px;background:var(--bg)}
+.results{position:absolute;top:48px;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:60vh;overflow-y:auto;z-index:40}
+.results .grp{padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase}
+.results .r{padding:9px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border-top:1px solid var(--line-2)}
+.results .r:hover{background:var(--teal-tint)}
+.results .r .nm{font-weight:600}
+.results .r .mt{color:var(--muted);font-size:12.5px;margin-left:auto;font-family:var(--mono)}
+.results .empty{padding:18px 14px;color:var(--muted);font-size:13px}
+.top-actions{margin-left:auto;display:flex;gap:8px}
+
+.content{padding:24px 28px 60px;max-width:1200px;width:100%}
+.page-h{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px}
+.page-h h1{font-size:22px;margin:0;letter-spacing:-.02em;font-weight:750}
+.page-h .desc{color:var(--muted);font-size:13px;margin-bottom:3px}
+.page-h .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* buttons */
+.btn{height:38px;padding:0 15px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:7px;transition:.12s}
+.btn:hover{border-color:var(--muted-2);background:#fff}
+.btn.pri{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.pri:hover{background:var(--teal-600);border-color:var(--teal-600)}
+.btn.sm{height:31px;padding:0 11px;font-size:12.5px;border-radius:8px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--teal)}
+.btn.ghost:hover{background:var(--teal-tint)}
+.btn.danger{color:var(--warn);border-color:var(--line)}
+.btn.danger:hover{background:var(--warn-tint);border-color:var(--warn-tint)}
+
+/* stat cards */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat .lab{font-size:12px;color:var(--muted);font-weight:600}
+.stat .val{font-size:28px;font-weight:780;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+.stat .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:3px}
+.stat .dot{position:absolute;top:16px;right:16px;width:9px;height:9px;border-radius:50%}
+.stat.a .dot{background:var(--teal)} .stat.b .dot{background:var(--ok)}
+.stat.c .dot{background:var(--warn)} .stat.d .dot{background:var(--violet)} .stat.e .dot{background:var(--amber)}
+
+.grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.panel .ph{padding:15px 18px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:10px}
+.panel .ph h3{margin:0;font-size:14px;font-weight:700}
+.panel .ph .more{margin-left:auto}
+.panel .pb{padding:6px 8px}
+
+/* channel bars */
+.chbar{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.chbar .nm{width:120px;font-size:12.5px;color:var(--ink-2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chbar .track{flex:1;height:9px;background:var(--line-2);border-radius:6px;overflow:hidden}
+.chbar .fill{height:100%;background:linear-gradient(90deg,var(--teal),#3AA6AE);border-radius:6px}
+.chbar .n{font-family:var(--mono);font-size:12px;color:var(--muted);width:38px;text-align:right}
+
+/* table */
+.tablewrap{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.toolbar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.toolbar .cnt{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{height:30px;padding:0 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);font-size:12.5px;color:var(--muted);font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.fchip:hover{border-color:var(--muted-2)}
+.fchip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mini-in{height:32px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px;background:var(--card)}
+.mini-in:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-tint)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:.03em;text-transform:uppercase;padding:11px 14px;border-bottom:1px solid var(--line);background:#FAFCFC;position:sticky;top:0}
+td{padding:12px 14px;border-bottom:1px solid var(--line-2);font-size:13.5px;vertical-align:middle}
+tbody tr{cursor:pointer;transition:.08s}
+tbody tr:hover{background:var(--teal-tint)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.need{background:#FEF9EE}
+tbody tr.need:hover{background:#FBF1DC}
+.nm-cell{font-weight:650;color:var(--ink)}
+.sub-cell{color:var(--muted);font-size:12.5px}
+.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:-.01em}
+.serial{font-family:var(--mono);font-size:12.5px;background:var(--line-2);color:var(--ink-2);padding:3px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.serial .d{width:6px;height:6px;border-radius:50%}
+.tabnum{font-variant-numeric:tabular-nums}
+
+/* status pill */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.pill .d{width:6px;height:6px;border-radius:50%}
+.s-normal{background:var(--ok-tint);color:#0A6E4C} .s-normal .d{background:var(--ok)}
+.s-return_req{background:var(--warn-tint);color:#912316} .s-return_req .d{background:var(--warn)}
+.s-return_done{background:var(--warn-tint);color:#912316} .s-return_done .d{background:var(--warn)}
+.s-exchange_req{background:var(--violet-tint);color:#4A3488} .s-exchange_req .d{background:var(--violet)}
+.s-exchange_done{background:var(--violet-tint);color:#4A3488} .s-exchange_done .d{background:var(--violet)}
+.s-cancelled{background:var(--gray-tint);color:#455158} .s-cancelled .d{background:var(--gray)}
+.wpill{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+.w-in{background:var(--ok-tint);color:#0A6E4C}
+.w-soon{background:var(--amber-tint);color:#7C4A0B}
+.w-out{background:var(--gray-tint);color:#525E64}
+
+.empty-state{padding:52px 20px;text-align:center;color:var(--muted)}
+.empty-state .big{font-size:15px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+
+/* drawer */
+.backdrop{position:fixed;inset:0;background:rgba(16,38,46,.42);z-index:60;opacity:0;pointer-events:none;transition:.2s}
+.backdrop.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(600px,94vw);background:var(--bg);z-index:70;box-shadow:var(--shadow-lg);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.drawer.show{transform:none}
+.dh{padding:20px 22px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+.dh .row1{display:flex;align-items:flex-start;gap:12px}
+.dh .cname{font-size:20px;font-weight:750;letter-spacing:-.02em}
+.dh .cmeta{color:var(--muted);font-size:13px;margin-top:3px;display:flex;gap:14px;flex-wrap:wrap}
+.dh .cmeta b{color:var(--ink-2);font-weight:600}
+.dh .x{margin-left:auto;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.dh .x:hover{background:var(--bg)}
+.dtabs{display:flex;gap:2px;padding:12px 22px 0;background:var(--card);border-bottom:1px solid var(--line)}
+.dtab{padding:9px 14px;border:none;background:none;font-weight:650;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.dtab.on{color:var(--teal);border-bottom-color:var(--teal)}
+.dtab .c{font-family:var(--mono);font-size:11px;margin-left:5px;color:var(--muted-2)}
+.dbody{flex:1;overflow-y:auto;padding:18px 22px 40px}
+
+.tl{position:relative;padding-left:22px}
+.tl:before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl-item{position:relative;margin-bottom:14px}
+.tl-item:before{content:"";position:absolute;left:-21px;top:5px;width:11px;height:11px;border-radius:50%;background:var(--teal);border:2px solid var(--bg)}
+.tl-item.ret:before{background:var(--warn)} .tl-item.exc:before{background:var(--violet)} .tl-item.as:before{background:var(--amber)}
+.card-item{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+.card-item .ci-h{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.card-item .ci-date{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.card-item .ci-body{font-size:13px;color:var(--ink-2)}
+.card-item .ci-meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;gap:12px;flex-wrap:wrap}
+
+.field{margin-bottom:13px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13.5px;background:var(--card);color:var(--ink)}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-tint)}
+.field textarea{min-height:74px;resize:vertical}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+.modal.show{display:flex}
+.modal .mbd{position:absolute;inset:0;background:rgba(16,38,46,.42)}
+.modal .mcard{position:relative;background:var(--card);border-radius:16px;box-shadow:var(--shadow-lg);width:min(480px,96vw);max-height:90vh;overflow-y:auto}
+.modal .mh{padding:18px 22px;border-bottom:1px solid var(--line-2);display:flex;align-items:center}
+.modal .mh h3{margin:0;font-size:16px;font-weight:730}
+.modal .mc{padding:18px 22px}
+.modal .mf{padding:14px 22px;border-top:1px solid var(--line-2);display:flex;gap:9px;justify-content:flex-end}
+
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:11px;font-size:13.5px;font-weight:600;z-index:100;opacity:0;transition:.24s;box-shadow:var(--shadow-lg);pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.banner{background:var(--amber-tint);color:#7C4A0B;padding:9px 16px;font-size:12.5px;font-weight:600;text-align:center;border-bottom:1px solid #EFDCB8}
+.hl{background:#FFF4CC;border-radius:3px;padding:0 1px}
+
+@media(max-width:920px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:-260px;transition:.2s;z-index:90;width:232px}
+  .side.open{left:0}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .topbar{padding:12px 14px}
+  .content{padding:16px 14px 60px}
+  .menu-btn{display:inline-flex!important}
+}
+.menu-btn{display:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);align-items:center;justify-content:center}
+/* 로그인 */
+#login{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#0F2A33,#10262E)}
+#login .box{width:min(400px,92vw);background:var(--card);border-radius:18px;box-shadow:var(--shadow-lg);padding:34px 30px}
+#login .lg-brand{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+#login .lg-tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;background:var(--teal);color:#fff;padding:3px 7px;border-radius:5px;font-weight:600}
+#login h2{margin:14px 0 4px;font-size:20px;font-weight:750}
+#login p.sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+#login label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin:0 0 5px}
+#login input{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;font-size:14px;margin-bottom:14px}
+#login input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-tint)}
+#login button{width:100%;height:46px;background:var(--teal);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:15px}
+#login button:hover{background:var(--teal-600)}
+#login button:disabled{opacity:.6}
+#login .err{color:var(--warn);font-size:12.5px;font-weight:600;min-height:18px;margin-bottom:8px}
+.foot .ue{color:#CFE0E2;font-weight:600;font-size:12px;word-break:break-all}
+.foot .role-badge{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--teal);color:#fff}
+.foot .logout{margin-top:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#CFE0E2;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600}
+.foot .logout:hover{background:rgba(255,255,255,.16)}
+/* 역할별 버튼 숨김 (조회자=쓰기·삭제 모두 숨김, 직원=삭제만 숨김) */
+body[data-role="viewer"] [data-action="new-customer"],
+body[data-role="viewer"] [data-action="new-sale"],
+body[data-role="viewer"] [data-action="manage-products"],
+body[data-role="viewer"] [data-edit-status],
+body[data-role="viewer"] [data-add-cons],
+body[data-role="viewer"] [data-add-sale-for],
+body[data-role="viewer"] [data-edit-cust],
+body[data-role="viewer"] [data-new-as],
+body[data-role="viewer"] [data-edit-cons],
+body[data-role="viewer"] [data-del-cons],
+body[data-role="viewer"] [data-del-as],
+body[data-role="viewer"] .rv-reason,
+body[data-role="viewer"] .rv-done{display:none!important}
+body[data-role="staff"] [data-del-cons],
+body[data-role="staff"] [data-del-as]{display:none!important}
+.hide-sm{}
+@media(max-width:920px){.hide-col{display:none}}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="box">
+    <div class="lg-brand"><span class="lg-tag">CVT</span></div>
+    <h2>씨엔브이텍 고객관리</h2>
+    <p class="sub">계속하려면 로그인하세요.</p>
+    <label>이메일</label>
+    <input id="login-email" type="email" autocomplete="username" placeholder="name@company.com">
+    <label>비밀번호</label>
+    <input id="login-pw" type="password" autocomplete="current-password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')submitLogin()">
+    <div class="err" id="login-err"></div>
+    <button id="login-btn" onclick="submitLogin()">로그인</button>
+  </div>
+</div>
+<div class="app" style="display:none">
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="mark"><span class="tag">CVT</span></div>
+      <div class="co">씨엔브이텍 고객관리</div>
+      <div class="sub">Customer Relationship System</div>
+    </div>
+    <nav class="nav" id="nav">
+      <a data-view="dashboard" class="on"><span class="ic">◧</span>대시보드</a>
+      <a data-view="customers"><span class="ic">◔</span>고객 관리<span class="badge" id="nb-cust">0</span></a>
+      <a data-view="sales"><span class="ic">◇</span>판매 · 시리얼<span class="badge" id="nb-sale">0</span></a>
+      <a data-view="returns"><span class="ic">⇄</span>반품 · 교환<span class="badge" id="nb-ret">0</span></a>
+      <a data-view="as"><span class="ic">◈</span>AS · 보증 조회</a>
+    </nav>
+    <div class="foot">
+      <div class="ue" id="user-email">—</div>
+      <div class="role-badge" id="role-badge" style="display:none"></div>
+      <div><button class="logout" onclick="logout()">로그아웃</button></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="menu-btn" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <div class="search">
+        <span class="si">⌕</span>
+        <input id="gsearch" placeholder="이름 · 연락처 · 시리얼 · 구매처로 통합검색" autocomplete="off">
+        <span class="hint">전체검색</span>
+        <div class="results" id="gresults" style="display:none"></div>
+      </div>
+      <div class="top-actions">
+        <button class="btn" data-action="backup">⤓ 백업·복원</button>
+        <button class="btn pri" data-action="new-customer">＋ 고객 등록</button>
+      </div>
+    </div>
+    <div class="content" id="app"></div>
+  </div>
+</div>
+
+<div class="backdrop" id="backdrop" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer"></div>
+<div class="modal" id="modal"><div class="mbd" onclick="closeModal()"></div><div class="mcard" id="mcard"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Supabase 연결 설정 ---------------- */
+const SB_URL='https://rioyawvqrnztithmctvl.supabase.co';
+const SB_KEY='sb_publishable_jw4GmotMLlH0UqRN1uD7_w_4Ckdjvpc';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+
+/* ---------------- state ---------------- */
+const STORE={customers:{},sales:{},consultations:{},asRecords:{},products:[]};
+let VIEW='dashboard';
+let DRAWER={id:null,tab:'purchases'};
+const STATUS_LABEL={normal:'정상',return_req:'반품접수',return_done:'반품완료',exchange_req:'교환접수',exchange_done:'교환완료',cancelled:'취소'};
+const CONS_TYPES=['전화','문자·카톡','이메일','방문','기타'];
+const RETURN_REASONS=['단순변심','제품불량','오배송·배송문제','사용불편·미숙','사이즈·호환','고객요청 취소','기타'];
+let returnsMode='list';
+let MYROLE='staff';
+const canWrite=()=>MYROLE==='admin'||MYROLE==='staff';
+const canDelete=()=>MYROLE==='admin';
+
+/* ---------------- DB <-> 앱 데이터 매핑 ---------------- */
+const toRow={
+  customers:c=>({name:c.name,phone:c.phone||null,address:c.address||null,memo:c.memo||null}),
+  sales:s=>({customer_id:s.customerId,sold_at:s.date||null,channel:s.channel||null,product_code:s.product||null,serial:s.serial||null,qty:s.qty||1,note:s.note||null,status:s.status||'normal',status_date:s.statusDate||null,status_reason:s.statusReason||null,status_note:s.statusNote||null,reviewed:!!s.reviewed}),
+  consultations:c=>({customer_id:c.customerId,consulted_at:c.date||null,type:c.type||null,content:c.content||null,handler:c.handler||null,follow_up:c.followUp||null}),
+  as_records:a=>({serial:a.serial||null,customer_id:a.customerId||null,received_at:a.date||null,status:a.status||null,symptom:a.symptom||null,action:a.action||null,cost:a.cost||null,handler:a.handler||null})
+};
+const fromRow={
+  customers:r=>({id:r.id,name:r.name||'',phone:r.phone||'',address:r.address||'',memo:r.memo||'',tags:[]}),
+  sales:r=>({id:r.id,customerId:r.customer_id,date:r.sold_at||'',channel:r.channel||'',product:r.product_code||'',serial:r.serial||'',qty:r.qty||1,note:r.note||'',status:r.status||'normal',statusDate:r.status_date||'',statusReason:r.status_reason||'',statusNote:r.status_note||'',reviewed:!!r.reviewed}),
+  consultations:r=>({id:r.id,customerId:r.customer_id,date:r.consulted_at||'',type:r.type||'',content:r.content||'',handler:r.handler||'',followUp:r.follow_up||''}),
+  as_records:r=>({id:r.id,serial:r.serial||'',customerId:r.customer_id,date:r.received_at||'',status:r.status||'',symptom:r.symptom||'',action:r.action||'',cost:r.cost||'',handler:r.handler||''}),
+  products:r=>({code:r.code,name:r.name,warrantyMonths:r.warranty_months||12})
+};
+
+/* ---------------- DB 헬퍼 ---------------- */
+async function dbCreate(table,obj){
+  const {data,error}=await sb.from(table).insert(toRow[table](obj)).select().single();
+  if(error){toast('저장 실패: '+error.message);throw error;}
+  return fromRow[table](data);
+}
+async function dbUpdate(table,id,obj){
+  const {error}=await sb.from(table).update(toRow[table](obj)).eq('id',id);
+  if(error){toast('저장 실패: '+error.message);throw error;}
+}
+async function dbDelete(table,id){
+  const {error}=await sb.from(table).delete().eq('id',id);
+  if(error){toast('삭제 실패: '+error.message);throw error;}
+}
+async function loadAll(){
+  const [cu,sa,co,ar,pr]=await Promise.all([
+    sb.from('customers').select('*'),
+    sb.from('sales').select('*'),
+    sb.from('consultations').select('*'),
+    sb.from('as_records').select('*'),
+    sb.from('products').select('*')
+  ]);
+  const err=cu.error||sa.error||co.error||ar.error||pr.error;
+  if(err){toast('데이터를 불러오지 못했습니다: '+err.message);console.error(err);}
+  STORE.customers={};(cu.data||[]).forEach(r=>STORE.customers[r.id]=fromRow.customers(r));
+  STORE.sales={};(sa.data||[]).forEach(r=>STORE.sales[r.id]=fromRow.sales(r));
+  STORE.consultations={};(co.data||[]).forEach(r=>STORE.consultations[r.id]=fromRow.consultations(r));
+  STORE.asRecords={};(ar.data||[]).forEach(r=>STORE.asRecords[r.id]=fromRow.as_records(r));
+  STORE.products=(pr.data||[]).map(fromRow.products);
+  if(!STORE.products.length)STORE.products=[{code:'CVT-100',name:'CVT-100 (삼각대)',warrantyMonths:12}];
+}
+
+/* ---------------- 로그인 / 인증 ---------------- */
+async function boot(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session)await afterLogin(); else showLogin();
+  }catch(e){console.error(e);showLogin('연결 오류가 발생했습니다. 새로고침 후 다시 시도하세요.');}
+}
+function showLogin(msg){
+  document.querySelector('.app').style.display='none';
+  $('#login').style.display='flex';
+  if(msg)$('#login-err').textContent=msg;
+}
+async function submitLogin(){
+  const email=$('#login-email').value.trim();const pw=$('#login-pw').value;
+  if(!email||!pw){$('#login-err').textContent='이메일과 비밀번호를 입력하세요';return;}
+  $('#login-btn').disabled=true;$('#login-err').textContent='로그인 중…';
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  $('#login-btn').disabled=false;
+  if(error){$('#login-err').textContent='로그인 실패: '+error.message;return;}
+  await afterLogin();
+}
+async function afterLogin(){
+  $('#login').style.display='none';
+  document.querySelector('.app').style.display='grid';
+  try{
+    const {data:{user}}=await sb.auth.getUser();
+    const ue=$('#user-email');if(ue&&user)ue.textContent=user.email;
+    if(user){const {data:prof}=await sb.from('profiles').select('role').eq('id',user.id).single();MYROLE=(prof&&prof.role)||'staff';}
+  }catch(e){MYROLE='staff';}
+  document.body.dataset.role=MYROLE;
+  const rb=$('#role-badge');if(rb){rb.style.display='inline-block';rb.textContent=({admin:'관리자',staff:'직원',viewer:'조회자'}[MYROLE]||MYROLE);}
+  await loadAll();
+  render();
+}
+async function logout(){await sb.auth.signOut();location.reload();}
+
+/* ---------------- helpers ---------------- */
+const $=(s,r=document)=>r.querySelector(s);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function uid(p){return p+'_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);}
+function today(){return new Date().toISOString().slice(0,10);}
+function fmtDate(d){if(!d)return'—';return String(d).slice(0,10);}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+function showBanner(m){const b=document.createElement('div');b.className='banner';b.textContent=m;$('.main').prepend(b);}
+function salesOf(cid){return Object.values(STORE.sales).filter(s=>s.customerId===cid);}
+function consOf(cid){return Object.values(STORE.consultations).filter(c=>c.customerId===cid).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
+function asOf(serial){return Object.values(STORE.asRecords).filter(a=>a.serial===serial).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
+function asOfCust(cid){const ss=salesOf(cid).map(s=>s.serial);return Object.values(STORE.asRecords).filter(a=>ss.includes(a.serial));}
+function productOf(code){return STORE.products.find(p=>p.code===code)||{code,name:code,warrantyMonths:12};}
+function warranty(sale){
+  if(!sale.date)return{state:'unknown',label:'정보없음',cls:'w-out',end:''};
+  const p=productOf(sale.product);const end=new Date(sale.date);end.setMonth(end.getMonth()+(p.warrantyMonths||12));
+  const now=new Date();const days=Math.ceil((end-now)/86400000);
+  const endStr=end.toISOString().slice(0,10);
+  if(days<0)return{state:'out',label:'보증만료',cls:'w-out',end:endStr,days};
+  if(days<=45)return{state:'soon',label:'만료임박 '+days+'일',cls:'w-soon',end:endStr,days};
+  return{state:'in',label:'보증중 ~'+endStr,cls:'w-in',end:endStr,days};
+}
+function statusPill(st){return `<span class="pill s-${st}"><span class="d"></span>${STATUS_LABEL[st]||st}</span>`;}
+function serialChip(serial,sale){
+  if(!serial)return '<span class="sub-cell">—</span>';
+  let color='var(--muted-2)';
+  if(sale){const w=warranty(sale);color=w.state==='in'?'var(--ok)':w.state==='soon'?'var(--amber)':'var(--gray)';}
+  return `<span class="serial"><span class="d" style="background:${color}"></span>${esc(serial)}</span>`;
+}
+
+
+/* ---------------- render root ---------------- */
+function setNavCounts(){
+  $('#nb-cust').textContent=Object.keys(STORE.customers).length;
+  $('#nb-sale').textContent=Object.keys(STORE.sales).length;
+  const openRet=Object.values(STORE.sales).filter(s=>s.status==='return_req'||s.status==='exchange_req').length;
+  const totalRet=Object.values(STORE.sales).filter(s=>s.status!=='normal').length;
+  $('#nb-ret').textContent=openRet>0?openRet:totalRet;
+}
+function render(){
+  setNavCounts();
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.view===VIEW));
+  const c=$('#app');
+  if(VIEW==='dashboard')c.innerHTML=viewDashboard();
+  else if(VIEW==='customers')c.innerHTML=viewCustomers();
+  else if(VIEW==='sales')c.innerHTML=viewSales();
+  else if(VIEW==='returns')c.innerHTML=viewReturns();
+  else if(VIEW==='as')c.innerHTML=viewAS();
+  if(VIEW==='customers')bindCustomerFilters();
+  if(VIEW==='sales')bindSalesFilters();
+  if(VIEW==='returns')bindReturns();
+  if(VIEW==='as')bindASsearch();
+}
+
+/* ---------------- DASHBOARD ---------------- */
+function viewDashboard(){
+  const custs=Object.keys(STORE.customers).length;
+  const sales=Object.values(STORE.sales);
+  const tot=sales.length;
+  const ret=sales.filter(s=>s.status==='return_done'||s.status==='return_req').length;
+  const exc=sales.filter(s=>s.status==='exchange_done'||s.status==='exchange_req').length;
+  const open=sales.filter(s=>s.status==='return_req'||s.status==='exchange_req').length;
+  // channel dist
+  const ch={};sales.forEach(s=>{const k=s.channel||'미상';ch[k]=(ch[k]||0)+1;});
+  const chSorted=Object.entries(ch).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const max=chSorted.length?chSorted[0][1]:1;
+  // warranty soon
+  const soon=sales.map(s=>({s,w:warranty(s)})).filter(x=>x.w.state==='soon'&&x.s.status==='normal').sort((a,b)=>a.w.days-b.w.days).slice(0,6);
+  // recent consultations
+  const recentCons=Object.values(STORE.consultations).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,6);
+
+  return `
+  <div class="page-h"><div><h1>대시보드</h1></div><div class="desc">전체 판매·고객 현황 요약</div></div>
+  <div class="stats">
+    <div class="stat a"><span class="dot"></span><div class="lab">전체 고객</div><div class="val tabnum">${custs}<small>명</small></div></div>
+    <div class="stat b"><span class="dot"></span><div class="lab">누적 판매</div><div class="val tabnum">${tot}<small>건</small></div></div>
+    <div class="stat c"><span class="dot"></span><div class="lab">반품</div><div class="val tabnum">${ret}<small>건</small></div></div>
+    <div class="stat d"><span class="dot"></span><div class="lab">교환</div><div class="val tabnum">${exc}<small>건</small></div></div>
+    <div class="stat e"><span class="dot"></span><div class="lab">처리 대기</div><div class="val tabnum">${open}<small>건</small></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h3>구매처별 판매 분포</h3><span class="more"><button class="btn sm ghost" data-view-go="sales">전체 보기 →</button></span></div>
+      <div class="pb">
+        ${chSorted.map(([k,v])=>`<div class="chbar"><div class="nm">${esc(k)}</div><div class="track"><div class="fill" style="width:${Math.max(4,v/max*100)}%"></div></div><div class="n">${v}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h3>보증 만료 임박</h3><span class="more"><button class="btn sm ghost" data-view-go="as">AS 조회 →</button></span></div>
+      <div class="pb">
+        ${soon.length?soon.map(x=>{const cu=STORE.customers[x.s.customerId]||{};return `<div class="chbar" data-open-cust="${x.s.customerId}" style="cursor:pointer"><div class="nm">${esc(cu.name||'—')}</div><div class="mono" style="flex:1;color:var(--muted)">${esc(x.s.serial)}</div><div><span class="wpill w-soon">D-${x.w.days}</span></div></div>`;}).join(''):'<div class="empty-state" style="padding:26px"><div>45일 내 만료 예정 건이 없습니다.</div></div>'}
+      </div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:18px">
+    <div class="ph"><h3>최근 상담 이력</h3></div>
+    <div class="pb" style="padding:10px 14px">
+      ${recentCons.length?recentCons.map(cn=>{const cu=STORE.customers[cn.customerId]||{};return `<div class="chbar" data-open-cust="${cn.customerId}" style="cursor:pointer;border-bottom:1px solid var(--line-2)"><div class="nm" style="width:90px">${esc(cu.name||'—')}</div><span class="pill s-normal" style="background:var(--teal-tint);color:var(--teal-600)"><span class="d" style="background:var(--teal)"></span>${esc(cn.type)}</span><div style="flex:1;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(cn.content)}</div><div class="ci-date">${fmtDate(cn.date)}</div></div>`;}).join(''):'<div class="empty-state"><div class="big">아직 상담 이력이 없습니다</div><div>고객 상세에서 상담 내용을 기록하면 이곳에 모입니다.</div></div>'}
+    </div>
+  </div>`;
+}
+
+/* ---------------- CUSTOMERS ---------------- */
+let custFilter={q:'',status:'all'};
+function viewCustomers(){
+  return `
+  <div class="page-h"><div><h1>고객 관리</h1></div><div class="desc">고객별 구매·상담·반품 이력을 한 곳에서 관리</div>
+    <div class="right"><button class="btn pri" data-action="new-customer">＋ 고객 등록</button></div></div>
+  <div class="tablewrap">
+    <div class="toolbar">
+      <input class="mini-in" id="cf-q" placeholder="이름·연락처·주소 검색" style="width:230px" value="${esc(custFilter.q)}">
+      <div class="chip-row" id="cf-status">
+        ${['all','has_return','has_cons'].map(k=>`<button class="fchip ${custFilter.status===k?'on':''}" data-cf="${k}">${({all:'전체',has_return:'반품·교환 있음',has_cons:'상담이력 있음'})[k]}</button>`).join('')}
+      </div>
+      <span class="cnt" id="cf-cnt"></span>
+    </div>
+    <div style="max-height:calc(100vh - 240px);overflow:auto">
+    <table><thead><tr>
+      <th>고객명</th><th>연락처</th><th class="hide-col">주소</th><th>구매</th><th>상담</th><th>상태</th>
+    </tr></thead><tbody id="cust-tbody"></tbody></table>
+    </div>
+  </div>`;
+}
+function custRows(){
+  let list=Object.values(STORE.customers).map(c=>{
+    const ss=salesOf(c.id);const cons=consOf(c.id);
+    const hasRet=ss.some(s=>s.status!=='normal');
+    return {c,ss,cons,hasRet,last:ss.map(s=>s.date).sort().slice(-1)[0]||''};
+  });
+  const q=custFilter.q.trim().toLowerCase();
+  if(q)list=list.filter(x=>((x.c.name||'')+ (x.c.phone||'')+(x.c.address||'')).toLowerCase().includes(q));
+  if(custFilter.status==='has_return')list=list.filter(x=>x.hasRet);
+  if(custFilter.status==='has_cons')list=list.filter(x=>x.cons.length>0);
+  list.sort((a,b)=>(b.last||'').localeCompare(a.last||''));
+  $('#cf-cnt')&&($('#cf-cnt').textContent=list.length+'명');
+  const tb=$('#cust-tbody');if(!tb)return;
+  if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="big">조건에 맞는 고객이 없습니다</div></div></td></tr>`;return;}
+  tb.innerHTML=list.slice(0,400).map(x=>{
+    const ret=x.hasRet?statusPill(x.ss.find(s=>s.status!=='normal').status):'<span class="pill s-normal"><span class="d"></span>정상</span>';
+    return `<tr data-open-cust="${x.c.id}">
+      <td class="nm-cell">${esc(x.c.name||'(이름없음)')}</td>
+      <td class="mono">${esc(x.c.phone||'—')}</td>
+      <td class="sub-cell hide-col" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.c.address||'—')}</td>
+      <td class="tabnum">${x.ss.length}건</td>
+      <td class="tabnum">${x.cons.length?x.cons.length+'회':'—'}</td>
+      <td>${ret}</td>
+    </tr>`;}).join('');
+}
+function bindCustomerFilters(){
+  custRows();
+  const q=$('#cf-q');if(q)q.oninput=()=>{custFilter.q=q.value;custRows();};
+  $('#cf-status')&&$('#cf-status').addEventListener('click',e=>{const b=e.target.closest('[data-cf]');if(!b)return;custFilter.status=b.dataset.cf;document.querySelectorAll('#cf-status .fchip').forEach(f=>f.classList.toggle('on',f.dataset.cf===custFilter.status));custRows();});
+}
+
+/* ---------------- SALES ---------------- */
+let salesFilter={q:'',channel:'all',status:'all'};
+function viewSales(){
+  const channels=[...new Set(Object.values(STORE.sales).map(s=>s.channel).filter(Boolean))];
+  const topCh=Object.entries(Object.values(STORE.sales).reduce((a,s)=>{a[s.channel]=(a[s.channel]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(x=>x[0]);
+  return `
+  <div class="page-h"><div><h1>판매 · 시리얼</h1></div><div class="desc">전체 출고 내역 — 시리얼로 즉시 조회</div>
+    <div class="right"><button class="btn" data-action="manage-products">품목 관리</button><button class="btn pri" data-action="new-sale">＋ 판매 등록</button></div></div>
+  <div class="tablewrap">
+    <div class="toolbar">
+      <input class="mini-in" id="sf-q" placeholder="시리얼·고객명·연락처" style="width:230px" value="${esc(salesFilter.q)}">
+      <div class="chip-row" id="sf-ch">
+        <button class="fchip ${salesFilter.channel==='all'?'on':''}" data-ch="all">전체 채널</button>
+        ${topCh.map(c=>`<button class="fchip ${salesFilter.channel===c?'on':''}" data-ch="${esc(c)}">${esc(c)}</button>`).join('')}
+      </div>
+      <div class="chip-row" id="sf-st">
+        ${['all','normal','return_done','exchange_done'].map(k=>`<button class="fchip ${salesFilter.status===k?'on':''}" data-st="${k}">${({all:'전체상태',normal:'정상',return_done:'반품',exchange_done:'교환'})[k]}</button>`).join('')}
+      </div>
+      <span class="cnt" id="sf-cnt"></span>
+    </div>
+    <div style="max-height:calc(100vh - 240px);overflow:auto">
+    <table><thead><tr>
+      <th>출고일</th><th>고객</th><th>구매처</th><th>품목</th><th>시리얼</th><th>보증</th><th>상태</th>
+    </tr></thead><tbody id="sale-tbody"></tbody></table>
+    </div>
+  </div>`;
+}
+function saleRows(){
+  let list=Object.values(STORE.sales);
+  const q=salesFilter.q.trim().toLowerCase();
+  if(q)list=list.filter(s=>{const cu=STORE.customers[s.customerId]||{};return ((s.serial||'')+(cu.name||'')+(cu.phone||'')).toLowerCase().includes(q);});
+  if(salesFilter.channel!=='all')list=list.filter(s=>s.channel===salesFilter.channel);
+  if(salesFilter.status!=='all')list=list.filter(s=>s.status===salesFilter.status||(salesFilter.status==='return_done'&&s.status==='return_req')||(salesFilter.status==='exchange_done'&&s.status==='exchange_req'));
+  list.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  $('#sf-cnt')&&($('#sf-cnt').textContent=list.length+'건');
+  const tb=$('#sale-tbody');if(!tb)return;
+  if(!list.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="big">해당 조건의 판매가 없습니다</div></div></td></tr>`;return;}
+  tb.innerHTML=list.slice(0,500).map(s=>{const cu=STORE.customers[s.customerId]||{};const w=warranty(s);
+    return `<tr data-open-cust="${s.customerId}">
+      <td class="mono">${fmtDate(s.date)}</td>
+      <td><div class="nm-cell">${esc(cu.name||'—')}</div><div class="sub-cell mono">${esc(cu.phone||'')}</div></td>
+      <td>${esc(s.channel||'—')}</td>
+      <td class="sub-cell">${esc(s.product||'—')}</td>
+      <td>${serialChip(s.serial,s)}</td>
+      <td>${s.serial?`<span class="wpill ${w.cls}">${w.label}</span>`:'—'}</td>
+      <td>${statusPill(s.status)}</td>
+    </tr>`;}).join('');
+}
+function bindSalesFilters(){
+  saleRows();
+  const q=$('#sf-q');if(q)q.oninput=()=>{salesFilter.q=q.value;saleRows();};
+  $('#sf-ch').addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(!b)return;salesFilter.channel=b.dataset.ch;document.querySelectorAll('#sf-ch .fchip').forEach(f=>f.classList.toggle('on',f.dataset.ch===salesFilter.channel));saleRows();});
+  $('#sf-st').addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!b)return;salesFilter.status=b.dataset.st;document.querySelectorAll('#sf-st .fchip').forEach(f=>f.classList.toggle('on',f.dataset.st===salesFilter.status));saleRows();});
+}
+
+/* ---------------- RETURNS ---------------- */
+function viewReturns(){
+  const list=Object.values(STORE.sales).filter(s=>s.status!=='normal').sort((a,b)=>{
+    const rank=x=>({return_req:0,exchange_req:1,return_done:2,exchange_done:3,cancelled:4}[x.status]);
+    return rank(a)-rank(b)||(b.date||'').localeCompare(a.date||'');
+  });
+  const openCount=list.filter(s=>s.status==='return_req'||s.status==='exchange_req').length;
+  const needReview=list.filter(s=>!s.reviewed).length;
+  const toggle=`<button class="btn ${returnsMode==='review'?'pri':''}" data-rmode="${returnsMode==='list'?'review':'list'}">${returnsMode==='list'?'⚑ 사유 검토'+(needReview?' ('+needReview+')':''):'← 목록으로'}</button>`;
+  const head=`<div class="page-h"><div><h1>반품 · 교환</h1></div><div class="desc">${returnsMode==='review'?'자동 분류된 사유를 확인·정정하세요':'접수부터 완료까지 상태로 추적'}</div><div class="right">${toggle}</div></div>`;
+  if(returnsMode==='review')return head+reviewTable(list,needReview);
+  return head+`
+  ${openCount?`<div style="margin-bottom:16px"><span class="pill s-return_req" style="font-size:13px;padding:6px 12px"><span class="d"></span>처리 대기 ${openCount}건</span></div>`:''}
+  <div class="tablewrap">
+    <div class="toolbar"><span class="cnt">전체 ${list.length}건</span>${needReview?`<span class="cnt" style="color:var(--amber)">· 검토 필요 ${needReview}건</span>`:''}</div>
+    <div style="max-height:calc(100vh - 240px);overflow:auto">
+    <table><thead><tr><th>구분</th><th>고객</th><th>시리얼</th><th>구매처</th><th>사유·메모</th><th>처리일</th><th></th></tr></thead>
+    <tbody>
+    ${list.length?list.map(s=>{const cu=STORE.customers[s.customerId]||{};
+      return `<tr class="${s.reviewed?'':'need'}" data-open-cust="${s.customerId}">
+        <td>${statusPill(s.status)}</td>
+        <td><div class="nm-cell">${esc(cu.name||'—')}</div><div class="sub-cell mono">${esc(cu.phone||'')}</div></td>
+        <td>${serialChip(s.serial,s)}</td>
+        <td class="sub-cell">${esc(s.channel||'—')}</td>
+        <td class="sub-cell" style="max-width:260px">${esc(s.statusReason||s.statusNote||'—')}</td>
+        <td class="mono">${fmtDate(s.statusDate)}</td>
+        <td onclick="event.stopPropagation()"><button class="btn sm" data-edit-status="${s.id}">상태변경</button></td>
+      </tr>`;}).join(''):`<tr><td colspan="7"><div class="empty-state"><div class="big">반품·교환 건이 없습니다</div><div>판매 목록이나 고객 상세에서 상태를 변경하면 이곳에 모입니다.</div></div></td></tr>`}
+    </tbody></table>
+    </div>
+  </div>`;
+}
+function reviewTable(list,needReview){
+  const pending=list.filter(s=>!s.reviewed);const done=list.filter(s=>s.reviewed);
+  const ordered=[...pending,...done];
+  return `
+  <div class="tablewrap">
+    <div class="toolbar"><span class="cnt">전체 ${list.length}건 · <b style="color:var(--amber)">검토 필요 ${needReview}건</b></span>
+      <span class="cnt" style="margin-left:auto">원본 메모를 보고 사유를 고르면 자동으로 검토완료 처리됩니다</span></div>
+    <div style="max-height:calc(100vh - 240px);overflow:auto">
+    <table><thead><tr><th>구분</th><th>고객</th><th>시리얼</th><th>원본 메모 (엑셀 원문)</th><th>정리된 사유</th><th>검토</th></tr></thead>
+    <tbody>
+    ${ordered.map(s=>{const cu=STORE.customers[s.customerId]||{};
+      const custom=s.statusReason&&!RETURN_REASONS.includes(s.statusReason);
+      return `<tr class="${s.reviewed?'':'need'}">
+        <td>${statusPill(s.status)}</td>
+        <td class="nm-cell">${esc(cu.name||'—')}</td>
+        <td>${serialChip(s.serial,s)}</td>
+        <td class="sub-cell" style="max-width:230px">${esc(s.statusNote||'—')}</td>
+        <td onclick="event.stopPropagation()"><select class="mini-in rv-reason" data-id="${s.id}" style="width:158px">
+          <option value="">— 사유 선택 —</option>
+          ${RETURN_REASONS.map(r=>`<option ${s.statusReason===r?'selected':''}>${r}</option>`).join('')}
+          ${custom?`<option selected>${esc(s.statusReason)}</option>`:''}
+        </select></td>
+        <td onclick="event.stopPropagation()"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px"><input type="checkbox" class="rv-done" data-id="${s.id}" ${s.reviewed?'checked':''}> 완료</label></td>
+      </tr>`;}).join('')}
+    </tbody></table>
+    </div>
+  </div>`;
+}
+function bindReturns(){
+  const c=$('#app');if(!c)return;
+  c.querySelectorAll('.rv-reason').forEach(sel=>sel.addEventListener('change',()=>{
+    if(!canWrite())return;const s=STORE.sales[sel.dataset.id];if(!s)return;s.statusReason=sel.value;if(sel.value)s.reviewed=true;dbUpdate('sales',s.id,s).catch(()=>{});
+    const tr=sel.closest('tr');tr.classList.toggle('need',!s.reviewed);const cb=tr.querySelector('.rv-done');if(cb)cb.checked=s.reviewed;setNavCounts();updateReviewCount();
+  }));
+  c.querySelectorAll('.rv-done').forEach(cb=>cb.addEventListener('change',()=>{
+    if(!canWrite())return;const s=STORE.sales[cb.dataset.id];if(!s)return;s.reviewed=cb.checked;dbUpdate('sales',s.id,s).catch(()=>{});
+    cb.closest('tr').classList.toggle('need',!s.reviewed);setNavCounts();updateReviewCount();
+  }));
+}
+function updateReviewCount(){const n=Object.values(STORE.sales).filter(s=>s.status!=='normal'&&!s.reviewed).length;const b=$('.toolbar b');if(b)b.textContent='검토 필요 '+n+'건';}
+
+/* ---------------- AS / WARRANTY ---------------- */
+let asQuery='';
+function viewAS(){
+  return `
+  <div class="page-h"><div><h1>AS · 보증 조회</h1></div><div class="desc">시리얼 번호로 고객·보증·수리 이력을 즉시 확인</div></div>
+  <div class="panel" style="margin-bottom:18px">
+    <div class="pb" style="padding:18px">
+      <div style="position:relative;max-width:460px">
+        <span class="si" style="position:absolute;left:14px;top:13px;color:var(--muted-2)">⌕</span>
+        <input id="as-in" class="mini-in" style="width:100%;height:44px;padding-left:40px;font-family:var(--mono);font-size:15px" placeholder="시리얼 입력 (예: C-2007-0130)" value="${esc(asQuery)}">
+      </div>
+    </div>
+  </div>
+  <div id="as-result"></div>`;
+}
+function renderASResult(){
+  const box=$('#as-result');if(!box)return;
+  const q=asQuery.trim().toLowerCase();
+  if(!q){box.innerHTML=`<div class="empty-state"><div class="big">시리얼을 입력하세요</div><div>일치하는 판매·고객·보증 상태와 AS 이력이 표시됩니다.</div></div>`;return;}
+  const matches=Object.values(STORE.sales).filter(s=>(s.serial||'').toLowerCase().includes(q));
+  if(!matches.length){box.innerHTML=`<div class="empty-state"><div class="big">일치하는 시리얼이 없습니다</div><div>번호를 다시 확인하거나 상단 통합검색을 이용하세요.</div></div>`;return;}
+  box.innerHTML=matches.slice(0,20).map(s=>{
+    const cu=STORE.customers[s.customerId]||{};const w=warranty(s);const as=asOf(s.serial);
+    return `<div class="panel" style="margin-bottom:16px">
+      <div class="ph" style="align-items:flex-start">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px">${serialChip(s.serial,s)}<span class="wpill ${w.cls}">${w.label}</span>${statusPill(s.status)}</div>
+          <div style="margin-top:10px;font-size:16px;font-weight:700">${esc(cu.name||'—')} <span style="font-weight:500;color:var(--muted);font-size:13px" class="mono">${esc(cu.phone||'')}</span></div>
+          <div class="sub-cell" style="margin-top:3px">${esc(cu.address||'')}</div>
+        </div>
+        <div class="more" style="text-align:right">
+          <div class="sub-cell">출고일 <b class="mono" style="color:var(--ink-2)">${fmtDate(s.date)}</b></div>
+          <div class="sub-cell">품목 <b style="color:var(--ink-2)">${esc(s.product)}</b> · ${esc(s.channel||'')}</div>
+          <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end">
+            <button class="btn sm" data-open-cust="${s.customerId}">고객 상세</button>
+            <button class="btn sm pri" data-new-as="${esc(s.serial)}|${s.customerId}">＋ AS 접수</button>
+          </div>
+        </div>
+      </div>
+      <div class="pb" style="padding:14px 18px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px">AS 이력 ${as.length?'('+as.length+'건)':''}</div>
+        ${as.length?`<div class="tl">${as.map(a=>`<div class="tl-item as"><div class="card-item"><div class="ci-h"><span class="pill s-normal" style="background:var(--amber-tint);color:#7C4A0B"><span class="d" style="background:var(--amber)"></span>${esc(a.status||'접수')}</span><span class="ci-date">${fmtDate(a.date)}</span></div><div class="ci-body"><b>증상:</b> ${esc(a.symptom||'—')}</div>${a.action?`<div class="ci-body"><b>조치:</b> ${esc(a.action)}</div>`:''}<div class="ci-meta">${a.cost?'<span>비용 '+esc(a.cost)+'</span>':''}${a.handler?'<span>담당 '+esc(a.handler)+'</span>':''}</div></div></div>`).join('')}</div>`:'<div class="sub-cell">등록된 AS 이력이 없습니다.</div>'}
+      </div>
+    </div>`;}).join('');
+}
+function bindASsearch(){
+  renderASResult();
+  const inp=$('#as-in');if(inp){inp.oninput=()=>{asQuery=inp.value;renderASResult();};inp.focus();}
+}
+
+/* ---------------- DRAWER (customer detail) ---------------- */
+function openCust(id){DRAWER={id,tab:'purchases'};renderDrawer();$('#drawer').classList.add('show');$('#backdrop').classList.add('show');}
+function closeDrawer(){$('#drawer').classList.remove('show');$('#backdrop').classList.remove('show');}
+function renderDrawer(){
+  const c=STORE.customers[DRAWER.id];if(!c)return;
+  const ss=salesOf(c.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const cons=consOf(c.id);const asr=asOfCust(c.id);
+  const retCount=ss.filter(s=>s.status!=='normal').length;
+  const d=$('#drawer');
+  d.innerHTML=`
+    <div class="dh">
+      <div class="row1">
+        <div>
+          <div class="cname">${esc(c.name||'(이름없음)')}</div>
+          <div class="cmeta"><span>☎ <b>${esc(c.phone||'—')}</b></span><span>구매 <b>${ss.length}건</b></span>${retCount?`<span>반품·교환 <b>${retCount}건</b></span>`:''}</div>
+          <div class="cmeta" style="margin-top:4px">${esc(c.address||'')}</div>
+        </div>
+        <button class="x" onclick="closeDrawer()">✕</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:7px">
+        <button class="btn sm" data-edit-cust="${c.id}">정보 수정</button>
+        <button class="btn sm pri" data-add-cons="${c.id}">＋ 상담 기록</button>
+        <button class="btn sm" data-add-sale-for="${c.id}">＋ 판매 추가</button>
+      </div>
+    </div>
+    <div class="dtabs">
+      <button class="dtab ${DRAWER.tab==='purchases'?'on':''}" data-dtab="purchases">구매·시리얼<span class="c">${ss.length}</span></button>
+      <button class="dtab ${DRAWER.tab==='cons'?'on':''}" data-dtab="cons">상담이력<span class="c">${cons.length}</span></button>
+      <button class="dtab ${DRAWER.tab==='ret'?'on':''}" data-dtab="ret">반품·교환<span class="c">${retCount}</span></button>
+      <button class="dtab ${DRAWER.tab==='as'?'on':''}" data-dtab="as">AS<span class="c">${asr.length}</span></button>
+    </div>
+    <div class="dbody">${drawerBody(c,ss,cons,asr)}</div>`;
+  d.querySelectorAll('[data-dtab]').forEach(b=>b.onclick=()=>{DRAWER.tab=b.dataset.dtab;renderDrawer();});
+}
+function drawerBody(c,ss,cons,asr){
+  if(DRAWER.tab==='purchases'){
+    if(!ss.length)return emptyBox('구매 내역이 없습니다','아래 버튼으로 판매를 추가할 수 있습니다.');
+    return `<div class="tl">${ss.map(s=>{const w=warranty(s);return `<div class="tl-item ${s.status.startsWith('return')?'ret':s.status.startsWith('exchange')?'exc':''}">
+      <div class="card-item">
+        <div class="ci-h">${serialChip(s.serial,s)}<span class="wpill ${w.cls}">${w.label}</span>${s.status!=='normal'?statusPill(s.status):''}<span class="ci-date" style="margin-left:auto">${fmtDate(s.date)}</span></div>
+        <div class="ci-meta"><span>품목 <b style="color:var(--ink-2)">${esc(s.product)}</b></span><span>구매처 ${esc(s.channel||'—')}</span><span>수량 ${s.qty||1}</span></div>
+        ${s.note?`<div class="ci-body" style="margin-top:6px">${esc(s.note)}</div>`:''}
+        <div style="margin-top:9px;display:flex;gap:6px"><button class="btn sm" data-edit-status="${s.id}">반품·교환 처리</button><button class="btn sm" data-new-as="${esc(s.serial)}|${c.id}">AS 접수</button></div>
+      </div></div>`;}).join('')}</div>`;
+  }
+  if(DRAWER.tab==='cons'){
+    if(!cons.length)return emptyBox('상담 이력이 없습니다','전화·방문·이메일 상담 내용을 기록해 두면 다음 응대가 쉬워집니다.');
+    return `<div class="tl">${cons.map(cn=>`<div class="tl-item">
+      <div class="card-item">
+        <div class="ci-h"><span class="pill s-normal" style="background:var(--teal-tint);color:var(--teal-600)"><span class="d" style="background:var(--teal)"></span>${esc(cn.type)}</span><span class="ci-date" style="margin-left:auto">${fmtDate(cn.date)}</span></div>
+        <div class="ci-body">${esc(cn.content)}</div>
+        <div class="ci-meta">${cn.handler?'<span>담당 '+esc(cn.handler)+'</span>':''}${cn.followUp?'<span>후속 '+esc(cn.followUp)+'</span>':''}
+          <span style="margin-left:auto;display:flex;gap:8px"><a href="#" data-edit-cons="${cn.id}" style="color:var(--teal)">수정</a><a href="#" data-del-cons="${cn.id}" style="color:var(--warn)">삭제</a></span>
+        </div>
+      </div></div>`).join('')}</div>`;
+  }
+  if(DRAWER.tab==='ret'){
+    const rets=ss.filter(s=>s.status!=='normal');
+    if(!rets.length)return emptyBox('반품·교환 이력이 없습니다','구매 탭에서 “반품·교환 처리”로 상태를 등록할 수 있습니다.');
+    return rets.map(s=>`<div class="card-item" style="margin-bottom:12px">
+      <div class="ci-h">${statusPill(s.status)}${serialChip(s.serial,s)}<span class="ci-date" style="margin-left:auto">${fmtDate(s.statusDate)}</span></div>
+      <div class="ci-body">${esc(s.statusReason||s.statusNote||'사유 미기재')}</div>
+      <div style="margin-top:8px"><button class="btn sm" data-edit-status="${s.id}">상태 수정</button></div>
+    </div>`).join('');
+  }
+  if(DRAWER.tab==='as'){
+    if(!asr.length)return emptyBox('AS 이력이 없습니다','구매 탭에서 시리얼별로 AS를 접수할 수 있습니다.');
+    return asr.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(a=>`<div class="card-item" style="margin-bottom:12px">
+      <div class="ci-h"><span class="pill s-normal" style="background:var(--amber-tint);color:#7C4A0B"><span class="d" style="background:var(--amber)"></span>${esc(a.status||'접수')}</span><span class="serial"><span class="d" style="background:var(--amber)"></span>${esc(a.serial)}</span><span class="ci-date" style="margin-left:auto">${fmtDate(a.date)}</span></div>
+      <div class="ci-body"><b>증상:</b> ${esc(a.symptom||'—')}</div>${a.action?`<div class="ci-body"><b>조치:</b> ${esc(a.action)}</div>`:''}
+      <div class="ci-meta">${a.cost?'<span>비용 '+esc(a.cost)+'</span>':''}${a.handler?'<span>담당 '+esc(a.handler)+'</span>':''}<a href="#" data-del-as="${a.id}" style="margin-left:auto;color:var(--warn)">삭제</a></div>
+    </div>`).join('');
+  }
+}
+function emptyBox(t,s){return `<div class="empty-state"><div class="big">${t}</div><div>${s}</div></div>`;}
+
+/* ---------------- MODAL forms ---------------- */
+function openModal(html){$('#mcard').innerHTML=html;$('#modal').classList.add('show');}
+function closeModal(){$('#modal').classList.remove('show');}
+
+function mCustomer(cust){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  const c=cust||{name:'',phone:'',address:'',memo:''};const editing=!!cust;
+  const prodOpts=STORE.products.map(p=>`<option value="${esc(p.code)}">${esc(p.name)}</option>`).join('');
+  openModal(`
+    <div class="mh"><h3>${editing?'고객 정보 수정':'고객 등록'}</h3></div>
+    <div class="mc">
+      <div class="field"><label>고객명</label><input id="f-name" value="${esc(c.name)}" placeholder="홍길동"></div>
+      <div class="field"><label>연락처</label><input id="f-phone" value="${esc(c.phone)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label>주소</label><input id="f-addr" value="${esc(c.address)}" placeholder="배송지 주소"></div>
+      <div class="field"><label>메모</label><textarea id="f-memo" placeholder="특이사항">${esc(c.memo||'')}</textarea></div>
+      ${editing?'':`
+      <div style="margin:6px -22px 0;padding:16px 22px 2px;border-top:1px solid var(--line-2);background:var(--bg)">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px">첫 구매 정보 <span style="font-weight:500;color:var(--muted-2)">(선택 — 구매처·시리얼 입력 시 판매로 함께 등록)</span></div>
+        <div class="field-row">
+          <div class="field"><label>구매처</label><input id="f-ch" placeholder="스마트스토어"></div>
+          <div class="field"><label>시리얼 No.</label><input id="f-serial" class="mono" placeholder="C-2007-0000"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>품목</label><select id="f-prod">${prodOpts}</select></div>
+          <div class="field"><label>출고일</label><input id="f-date" type="date" value="${today()}"></div>
+        </div>
+        <div class="field"><label>수량</label><input id="f-qty" type="number" min="1" value="1"></div>
+      </div>`}
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#f-save').onclick=async()=>{
+    const name=$('#f-name').value.trim();if(!name){toast('고객명을 입력하세요');return;}
+    try{
+    if(editing){
+      Object.assign(STORE.customers[c.id],{name,phone:$('#f-phone').value.trim(),address:$('#f-addr').value.trim(),memo:$('#f-memo').value.trim()});
+      await dbUpdate('customers',c.id,STORE.customers[c.id]);closeModal();render();renderDrawer();toast('저장되었습니다');return;
+    }
+    const newCust=await dbCreate('customers',{name,phone:$('#f-phone').value.trim(),address:$('#f-addr').value.trim(),memo:$('#f-memo').value.trim()});
+    STORE.customers[newCust.id]=newCust;
+    const serial=($('#f-serial')?.value||'').trim();const ch=($('#f-ch')?.value||'').trim();
+    if(serial||ch){
+      const newSale=await dbCreate('sales',{customerId:newCust.id,date:$('#f-date').value,channel:ch,product:$('#f-prod').value,serial,qty:+$('#f-qty').value||1,note:'첫 구매(고객 등록 시)',status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true});
+      STORE.sales[newSale.id]=newSale;
+    }
+    DRAWER.id=newCust.id;closeModal();render();openCust(newCust.id);toast('고객이 등록되었습니다');
+    }catch(e){}
+  };
+}
+
+function mSale(sale,forCust){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  const s=sale||{date:today(),channel:'',product:STORE.products[0]?.code||'CVT-100',serial:'',qty:1,note:'',customerId:forCust||''};
+  const editing=!!sale;
+  const custOpts=Object.values(STORE.customers).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${c.id}" ${c.id===s.customerId?'selected':''}>${esc(c.name)} · ${esc(c.phone||'')}</option>`).join('');
+  const prodOpts=STORE.products.map(p=>`<option value="${p.code}" ${p.code===s.product?'selected':''}>${esc(p.name)}</option>`).join('');
+  openModal(`
+    <div class="mh"><h3>${editing?'판매 수정':'판매 등록'}</h3></div>
+    <div class="mc">
+      <div class="field"><label>고객</label><select id="f-cust" ${forCust?'disabled':''}>${custOpts}</select></div>
+      <div class="field-row">
+        <div class="field"><label>출고일</label><input id="f-date" type="date" value="${esc(s.date)}"></div>
+        <div class="field"><label>수량</label><input id="f-qty" type="number" min="1" value="${s.qty||1}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>품목</label><select id="f-prod">${prodOpts}</select></div>
+        <div class="field"><label>구매처</label><input id="f-ch" value="${esc(s.channel)}" placeholder="스마트스토어"></div>
+      </div>
+      <div class="field"><label>시리얼</label><input id="f-serial" class="mono" value="${esc(s.serial)}" placeholder="C-2007-0000"></div>
+      <div class="field"><label>비고</label><input id="f-note" value="${esc(s.note||'')}"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#f-save').onclick=async()=>{
+    const cid=forCust||$('#f-cust').value;if(!cid){toast('고객을 선택하세요');return;}
+    const data={date:$('#f-date').value,qty:+$('#f-qty').value||1,product:$('#f-prod').value,channel:$('#f-ch').value.trim(),serial:$('#f-serial').value.trim(),note:$('#f-note').value.trim(),customerId:cid};
+    try{
+      if(editing){Object.assign(STORE.sales[s.id],data);await dbUpdate('sales',s.id,STORE.sales[s.id]);}
+      else{const ns=await dbCreate('sales',{status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true,...data});STORE.sales[ns.id]=ns;}
+      closeModal();render();if($('#drawer').classList.contains('show'))renderDrawer();toast('저장되었습니다');
+    }catch(e){}
+  };
+}
+
+function mStatus(sale){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  const s=sale;
+  openModal(`
+    <div class="mh"><h3>반품 · 교환 상태 변경</h3></div>
+    <div class="mc">
+      <div class="field"><label>대상</label><div class="card-item">${serialChip(s.serial,s)} · ${esc((STORE.customers[s.customerId]||{}).name||'')} · ${fmtDate(s.date)}</div></div>
+      <div class="field"><label>상태</label><select id="f-st">
+        ${Object.entries(STATUS_LABEL).map(([k,v])=>`<option value="${k}" ${s.status===k?'selected':''}>${v}</option>`).join('')}
+      </select></div>
+      <div class="field-row">
+        <div class="field"><label>처리일</label><input id="f-sd" type="date" value="${esc(s.statusDate||today())}"></div>
+        <div class="field"><label>담당</label><input id="f-handler" placeholder="담당자"></div>
+      </div>
+      <div class="field"><label>사유 · 메모</label><textarea id="f-reason" placeholder="단순변심 / 불량 / 오배송 등">${esc(s.statusReason||s.statusNote||'')}</textarea></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#f-save').onclick=async()=>{
+    Object.assign(STORE.sales[s.id],{status:$('#f-st').value,statusDate:$('#f-sd').value,statusReason:$('#f-reason').value.trim(),reviewed:true});
+    try{await dbUpdate('sales',s.id,STORE.sales[s.id]);closeModal();render();if($('#drawer').classList.contains('show'))renderDrawer();toast('상태가 변경되었습니다');}catch(e){}
+  };
+}
+
+function mCons(cust,cons){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  const c=cons||{type:'전화',date:today(),content:'',handler:'',followUp:''};const editing=!!cons;
+  openModal(`
+    <div class="mh"><h3>${editing?'상담 수정':'상담 기록'}</h3></div>
+    <div class="mc">
+      <div class="field-row">
+        <div class="field"><label>유형</label><select id="f-type">${CONS_TYPES.map(t=>`<option ${c.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>일자</label><input id="f-date" type="date" value="${esc(c.date)}"></div>
+      </div>
+      <div class="field"><label>상담 내용</label><textarea id="f-content" placeholder="문의·응대 내용을 기록하세요">${esc(c.content)}</textarea></div>
+      <div class="field-row">
+        <div class="field"><label>담당</label><input id="f-handler" value="${esc(c.handler||'')}"></div>
+        <div class="field"><label>후속 조치</label><input id="f-follow" value="${esc(c.followUp||'')}" placeholder="예: 3일 후 재연락"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#f-save').onclick=async()=>{
+    const content=$('#f-content').value.trim();if(!content){toast('상담 내용을 입력하세요');return;}
+    const data={type:$('#f-type').value,date:$('#f-date').value,content,handler:$('#f-handler').value.trim(),followUp:$('#f-follow').value.trim()};
+    try{
+      if(editing){Object.assign(STORE.consultations[c.id],data);await dbUpdate('consultations',c.id,STORE.consultations[c.id]);}
+      else{const nc=await dbCreate('consultations',{customerId:cust.id,...data});STORE.consultations[nc.id]=nc;}
+      closeModal();renderDrawer();render();toast('상담이 기록되었습니다');
+    }catch(e){}
+  };
+}
+
+function mAS(serial,cid){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  openModal(`
+    <div class="mh"><h3>AS 접수</h3></div>
+    <div class="mc">
+      <div class="field"><label>시리얼</label><input id="f-serial" class="mono" value="${esc(serial)}"></div>
+      <div class="field-row">
+        <div class="field"><label>접수일</label><input id="f-date" type="date" value="${today()}"></div>
+        <div class="field"><label>상태</label><select id="f-st"><option>접수</option><option>수리중</option><option>완료</option><option>보류</option></select></div>
+      </div>
+      <div class="field"><label>증상</label><textarea id="f-symptom" placeholder="고객이 알려준 증상"></textarea></div>
+      <div class="field"><label>조치 내용</label><textarea id="f-action" placeholder="수리·교체 조치"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>비용</label><input id="f-cost" placeholder="무상 / 30,000원"></div>
+        <div class="field"><label>담당</label><input id="f-handler"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#f-save').onclick=async()=>{
+    try{
+      const na=await dbCreate('as_records',{serial:$('#f-serial').value.trim(),customerId:cid,date:$('#f-date').value,status:$('#f-st').value,symptom:$('#f-symptom').value.trim(),action:$('#f-action').value.trim(),cost:$('#f-cost').value.trim(),handler:$('#f-handler').value.trim()});
+      STORE.asRecords[na.id]=na;
+      closeModal();render();if($('#drawer').classList.contains('show'))renderDrawer();if(VIEW==='as')renderASResult();toast('AS가 접수되었습니다');
+    }catch(e){}
+  };
+}
+
+function mProducts(){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
+  const rows=STORE.products.map((p,i)=>`<div class="field-row" style="grid-template-columns:1fr 1.6fr .9fr auto;align-items:end;margin-bottom:8px">
+    <div class="field" style="margin:0"><label>코드</label><input class="p-code" value="${esc(p.code)}"></div>
+    <div class="field" style="margin:0"><label>품목명</label><input class="p-name" value="${esc(p.name)}"></div>
+    <div class="field" style="margin:0"><label>보증(개월)</label><input class="p-w" type="number" value="${p.warrantyMonths||12}"></div>
+    <button class="btn sm danger" data-del-prod="${i}" style="margin-bottom:2px">삭제</button>
+  </div>`).join('');
+  openModal(`
+    <div class="mh"><h3>품목 관리</h3></div>
+    <div class="mc" id="prod-list">${rows}
+      <button class="btn sm" id="add-prod" style="margin-top:6px">＋ 품목 추가</button>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#add-prod').onclick=()=>{STORE.products.push({code:'',name:'',warrantyMonths:12});mProducts();};
+  $('#prod-list').addEventListener('click',e=>{const b=e.target.closest('[data-del-prod]');if(b){STORE.products.splice(+b.dataset.delProd,1);mProducts();}});
+  $('#f-save').onclick=async()=>{
+    const codes=[...document.querySelectorAll('.p-code')],names=[...document.querySelectorAll('.p-name')],ws=[...document.querySelectorAll('.p-w')];
+    const arr=[];codes.forEach((c,i)=>{if(c.value.trim())arr.push({code:c.value.trim(),name:names[i].value.trim()||c.value.trim(),warrantyMonths:+ws[i].value||12});});
+    if(!arr.length){toast('최소 1개 품목이 필요합니다');return;}
+    try{
+      const oldCodes=STORE.products.map(p=>p.code).filter(Boolean);
+      const {error}=await sb.from('products').upsert(arr.map(p=>({code:p.code,name:p.name,warranty_months:p.warrantyMonths})));
+      if(error){toast('저장 실패: '+error.message);return;}
+      const newCodes=arr.map(p=>p.code);
+      const removed=oldCodes.filter(c=>!newCodes.includes(c));
+      if(removed.length)await sb.from('products').delete().in('code',removed);
+      STORE.products=arr;closeModal();render();toast('품목이 저장되었습니다');
+    }catch(e){toast('저장 실패');}
+  };
+}
+
+/* ---------------- backup / export / restore ---------------- */
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);}
+function exportJson(){
+  const data=JSON.stringify({customers:STORE.customers,sales:STORE.sales,consultations:STORE.consultations,asRecords:STORE.asRecords,products:STORE.products,exportedAt:new Date().toISOString()},null,2);
+  download(`CVT_CRM_전체백업_${today()}.json`,new Blob([data],{type:'application/json'}));toast('전체 백업 파일을 저장했습니다');
+}
+function exportXlsx(){
+  if(typeof XLSX==='undefined'){toast('엑셀 모듈을 불러오는 중입니다 — 잠시 후 다시 시도하세요');return;}
+  const custRows=Object.values(STORE.customers).map(c=>({고객명:c.name||'',연락처:c.phone||'',주소:c.address||'',메모:c.memo||'',구매건수:salesOf(c.id).length}));
+  const saleRows=Object.values(STORE.sales).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(s=>{const cu=STORE.customers[s.customerId]||{};const w=warranty(s);return {출고일:s.date||'',고객명:cu.name||'',연락처:cu.phone||'',구매처:s.channel||'',품목:s.product||'',시리얼:s.serial||'',수량:s.qty||1,상태:STATUS_LABEL[s.status]||s.status,사유:s.statusReason||s.statusNote||'',처리일:s.statusDate||'',보증만료:w.end||'',비고:s.note||''};});
+  const consRows=Object.values(STORE.consultations).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(c=>{const cu=STORE.customers[c.customerId]||{};return {일자:c.date||'',고객명:cu.name||'',연락처:cu.phone||'',유형:c.type||'',내용:c.content||'',담당:c.handler||'',후속조치:c.followUp||''};});
+  const asRows=Object.values(STORE.asRecords).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(a=>{const cu=STORE.customers[a.customerId]||{};return {접수일:a.date||'',시리얼:a.serial||'',고객명:cu.name||'',상태:a.status||'',증상:a.symptom||'',조치:a.action||'',비용:a.cost||'',담당:a.handler||''};});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(custRows.length?custRows:[{고객명:''}]),'고객');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(saleRows.length?saleRows:[{출고일:''}]),'판매');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(consRows.length?consRows:[{일자:'',내용:''}]),'상담');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(asRows.length?asRows:[{접수일:'',시리얼:''}]),'AS');
+  XLSX.writeFile(wb,`씨엔브이텍_CRM_${today()}.xlsx`);toast('엑셀 파일을 내보냈습니다');
+}
+async function restoreToDB(d){
+  const withId=(obj,mapper)=>Object.values(obj||{}).map(x=>({id:x.id,...mapper(x)}));
+  const prods=(d.products||[]).map(p=>({code:p.code,name:p.name,warranty_months:p.warrantyMonths||12}));
+  const cust=withId(d.customers,toRow.customers);
+  const sales=withId(d.sales,toRow.sales);
+  const cons=withId(d.consultations,toRow.consultations);
+  const asr=withId(d.asRecords,toRow.as_records);
+  const up=async(t,rows,conflict)=>{if(!rows.length)return;const {error}=await sb.from(t).upsert(rows,conflict?{onConflict:conflict}:undefined);if(error)throw error;};
+  await up('products',prods,'code');
+  await up('customers',cust);
+  await up('sales',sales);
+  await up('consultations',cons);
+  await up('as_records',asr);
+}
+function importJson(e){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async()=>{
+    try{
+      if(!canWrite()){toast('복원 권한이 없습니다');return;}
+      const d=JSON.parse(rd.result);
+      if(!d.customers||!d.sales){toast('올바른 백업 파일이 아닙니다');return;}
+      if(!confirm('이 백업 파일의 내용을 클라우드 DB에 병합(같은 항목은 덮어쓰기)합니다. 계속할까요?')){e.target.value='';return;}
+      await restoreToDB(d);
+      await loadAll();closeModal();render();toast('백업을 복원했습니다');
+    }catch(err){toast('복원 실패 — 파일 형식을 확인하세요');console.error(err);}
+  };
+  rd.readAsText(f);
+}
+function mBackup(){
+  openModal(`
+    <div class="mh"><h3>백업 · 복원</h3></div>
+    <div class="mc">
+      <div class="field"><label>① 엑셀로 내보내기</label>
+        <div class="sub-cell" style="margin-bottom:9px">고객·판매·상담·AS를 시트별로 담은 .xlsx 파일을 내려받습니다. 보고·공유용으로 적합합니다.</div>
+        <button class="btn pri" id="b-xlsx">⤓ 엑셀(.xlsx) 다운로드</button></div>
+      <div class="field" style="margin-top:20px"><label>② 전체 백업 (JSON)</label>
+        <div class="sub-cell" style="margin-bottom:9px">모든 데이터를 원본 그대로 저장합니다. 아래 ‘복원’에 그대로 넣으면 되살릴 수 있습니다.</div>
+        <button class="btn" id="b-json">⤓ 전체 백업 파일 저장</button></div>
+      <div class="field" style="margin-top:20px"><label>③ 백업 복원</label>
+        <div class="sub-cell" style="margin-bottom:9px;color:var(--warn)">백업 파일의 항목을 클라우드 DB에 병합합니다(같은 항목은 덮어쓰기, 없던 항목은 추가).</div>
+        <input type="file" id="b-file" accept="application/json,.json" class="mini-in" style="width:100%;height:auto;padding:8px"></div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+  $('#b-xlsx').onclick=exportXlsx;$('#b-json').onclick=exportJson;$('#b-file').onchange=importJson;
+}
+
+/* ---------------- global search ---------------- */
+const gs=$('#gsearch'),gr=$('#gresults');
+gs.addEventListener('input',()=>{
+  const q=gs.value.trim().toLowerCase();
+  if(!q){gr.style.display='none';return;}
+  const custs=Object.values(STORE.customers).filter(c=>((c.name||'')+(c.phone||'')).toLowerCase().includes(q)).slice(0,6);
+  const serials=Object.values(STORE.sales).filter(s=>(s.serial||'').toLowerCase().includes(q)).slice(0,6);
+  const chans=[...new Set(Object.values(STORE.sales).map(s=>s.channel).filter(ch=>ch&&ch.toLowerCase().includes(q)))].slice(0,4);
+  let h='';
+  if(custs.length){h+='<div class="grp">고객</div>'+custs.map(c=>`<div class="r" data-open-cust="${c.id}"><span class="nm">${esc(c.name)}</span><span class="mt">${esc(c.phone||'')}</span></div>`).join('');}
+  if(serials.length){h+='<div class="grp">시리얼</div>'+serials.map(s=>{const cu=STORE.customers[s.customerId]||{};return `<div class="r" data-gs-serial="${esc(s.serial)}"><span class="serial">${esc(s.serial)}</span><span class="mt">${esc(cu.name||'')}</span></div>`;}).join('');}
+  if(chans.length){h+='<div class="grp">구매처</div>'+chans.map(c=>`<div class="r" data-gs-chan="${esc(c)}"><span class="nm">${esc(c)}</span><span class="mt">채널로 필터</span></div>`).join('');}
+  if(!h)h='<div class="empty">검색 결과가 없습니다</div>';
+  gr.innerHTML=h;gr.style.display='block';
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.search'))gr.style.display='none';});
+
+/* ---------------- global click delegation ---------------- */
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const navA=t.closest('#nav a');if(navA){VIEW=navA.dataset.view;$('#side').classList.remove('open');render();return;}
+  const go=t.closest('[data-view-go]');if(go){VIEW=go.dataset.viewGo;render();return;}
+  const oc=t.closest('[data-open-cust]');if(oc){openCust(oc.dataset.openCust);gr.style.display='none';gs.value='';return;}
+  const gsS=t.closest('[data-gs-serial]');if(gsS){VIEW='as';asQuery=gsS.dataset.gsSerial;render();gr.style.display='none';gs.value='';return;}
+  const gsC=t.closest('[data-gs-chan]');if(gsC){VIEW='sales';salesFilter.channel=gsC.dataset.gsChan;render();gr.style.display='none';gs.value='';return;}
+
+  const rm=t.closest('[data-rmode]');if(rm){returnsMode=rm.dataset.rmode;render();return;}
+  const act=t.closest('[data-action]');if(act){const a=act.dataset.action;
+    if(a==='new-customer')mCustomer(null);
+    if(a==='new-sale')mSale(null,null);
+    if(a==='manage-products')mProducts();
+    if(a==='backup')mBackup();
+    return;}
+  const es=t.closest('[data-edit-status]');if(es){e.stopPropagation();mStatus(STORE.sales[es.dataset.editStatus]);return;}
+  const na=t.closest('[data-new-as]');if(na){const[serial,cid]=na.dataset.newAs.split('|');mAS(serial,cid);return;}
+  const ec=t.closest('[data-edit-cust]');if(ec){mCustomer(STORE.customers[ec.dataset.editCust]);return;}
+  const ac=t.closest('[data-add-cons]');if(ac){mCons(STORE.customers[ac.dataset.addCons],null);return;}
+  const asf=t.closest('[data-add-sale-for]');if(asf){mSale(null,asf.dataset.addSaleFor);return;}
+  const edc=t.closest('[data-edit-cons]');if(edc){e.preventDefault();mCons(null,STORE.consultations[edc.dataset.editCons]);return;}
+  const dlc=t.closest('[data-del-cons]');if(dlc){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 상담 기록을 삭제할까요?')){const id=dlc.dataset.delCons;dbDelete('consultations',id).then(()=>{delete STORE.consultations[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
+  const dla=t.closest('[data-del-as]');if(dla){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 AS 기록을 삭제할까요?')){const id=dla.dataset.delAs;dbDelete('as_records',id).then(()=>{delete STORE.asRecords[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer();gr.style.display='none';}
+  if((e.key==='/'||(e.metaKey&&e.key==='k'))&&document.activeElement!==gs){e.preventDefault();gs.focus();}});
+
+boot();
+</script>
+</body>
+</html>
