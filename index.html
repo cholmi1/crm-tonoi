@@ -794,7 +794,7 @@ function drawerBody(c,ss,cons,asr){
         <div class="ci-h">${serialChip(s.serial,s)}<span class="wpill ${w.cls}">${w.label}</span>${s.status!=='normal'?statusPill(s.status):''}<span class="ci-date" style="margin-left:auto">${fmtDate(s.date)}</span></div>
         <div class="ci-meta"><span>품목 <b style="color:var(--ink-2)">${esc(s.product)}</b></span><span>구매처 ${esc(s.channel||'—')}</span><span>수량 ${s.qty||1}</span></div>
         ${s.note?`<div class="ci-body" style="margin-top:6px">${esc(s.note)}</div>`:''}
-        <div style="margin-top:9px;display:flex;gap:6px"><button class="btn sm" data-edit-status="${s.id}">반품·교환 처리</button><button class="btn sm" data-new-as="${esc(s.serial)}|${c.id}">AS 접수</button></div>
+        <div style="margin-top:9px;display:flex;gap:6px"><button class="btn sm" data-edit-status="${s.id}">반품·교환 처리</button><button class="btn sm" data-new-as="${esc(s.serial)}|${c.id}">AS 접수</button>${canDelete()?`<button class="btn sm danger" data-del-sale="${s.id}" style="margin-left:auto">삭제</button>`:''}</div>
       </div></div>`;}).join('')}</div>`;
   }
   if(DRAWER.tab==='cons'){
@@ -814,7 +814,7 @@ function drawerBody(c,ss,cons,asr){
     return rets.map(s=>`<div class="card-item" style="margin-bottom:12px">
       <div class="ci-h">${statusPill(s.status)}${serialChip(s.serial,s)}<span class="ci-date" style="margin-left:auto">${fmtDate(s.statusDate)}</span></div>
       <div class="ci-body">${esc(s.statusReason||s.statusNote||'사유 미기재')}</div>
-      <div style="margin-top:8px"><button class="btn sm" data-edit-status="${s.id}">상태 수정</button></div>
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="btn sm" data-edit-status="${s.id}">상태 수정</button>${canWrite()?`<button class="btn sm" data-revert-sale="${s.id}">정상 복귀</button>`:''}${canDelete()?`<button class="btn sm danger" data-del-sale="${s.id}" style="margin-left:auto">구매삭제</button>`:''}</div>
     </div>`).join('');
   }
   if(DRAWER.tab==='as'){
@@ -844,6 +844,7 @@ function mCustomer(cust){
       <div class="field-row"><div class="field" style="margin-bottom:10px"><label>품목</label><select class="se-prod">${opts}</select></div>
         <div class="field" style="margin-bottom:10px"><label>출고일</label><input type="date" class="se-date" value="${s?esc(s.date):today()}"></div></div>
       <div class="field" style="margin-bottom:10px"><label>수량</label><input type="number" min="1" class="se-qty" value="${s?(s.qty||1):1}"></div>
+      ${s&&canDelete()?`<div style="margin-bottom:10px"><button type="button" class="btn sm danger se-del" data-sid="${s.id}">이 구매 삭제</button></div>`:''}
     </div>`;
   };
   const existingSales=editing?salesOf(c.id).sort((a,b)=>(a.date||'').localeCompare(b.date||'')):[];
@@ -1154,6 +1155,9 @@ document.addEventListener('click',e=>{
   const ac=t.closest('[data-add-cons]');if(ac){mCons(STORE.customers[ac.dataset.addCons],null);return;}
   const asf=t.closest('[data-add-sale-for]');if(asf){mSale(null,asf.dataset.addSaleFor);return;}
   const edc=t.closest('[data-edit-cons]');if(edc){e.preventDefault();mCons(null,STORE.consultations[edc.dataset.editCons]);return;}
+  const sed=t.closest('.se-del');if(sed){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}const sid=sed.dataset.sid;if(confirm('이 구매(판매) 기록을 삭제할까요? 되돌릴 수 없습니다.')){dbDelete('sales',sid).then(()=>{delete STORE.sales[sid];const row=sed.closest('.sale-edit');if(row)row.remove();render();if($('#drawer').classList.contains('show'))renderDrawer();toast('구매 기록을 삭제했습니다');}).catch(()=>{});}return;}
+  const dls=t.closest('[data-del-sale]');if(dls){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}const id=dls.dataset.delSale;if(confirm('이 구매(판매) 기록을 삭제할까요? 되돌릴 수 없습니다.')){dbDelete('sales',id).then(()=>{delete STORE.sales[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
+  const rvs=t.closest('[data-revert-sale]');if(rvs){e.preventDefault();if(!canWrite()){toast('권한이 없습니다');return;}const id=rvs.dataset.revertSale;if(confirm('이 건의 반품·교환 상태를 취소하고 정상으로 되돌릴까요?')){const s=STORE.sales[id];Object.assign(s,{status:'normal',statusDate:'',statusReason:'',reviewed:true});dbUpdate('sales',id,s).then(()=>{renderDrawer();render();toast('정상으로 되돌렸습니다');}).catch(()=>{});}return;}
   const dlc=t.closest('[data-del-cons]');if(dlc){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 상담 기록을 삭제할까요?')){const id=dlc.dataset.delCons;dbDelete('consultations',id).then(()=>{delete STORE.consultations[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
   const dla=t.closest('[data-del-as]');if(dla){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 AS 기록을 삭제할까요?')){const id=dla.dataset.delAs;dbDelete('as_records',id).then(()=>{delete STORE.asRecords[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
 });
