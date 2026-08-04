@@ -323,6 +323,19 @@ let returnsMode='list';
 let MYROLE='staff';
 const canWrite=()=>MYROLE==='admin'||MYROLE==='staff';
 const canDelete=()=>MYROLE==='admin';
+const CHANNELS=['스마트스토어','쿠팡','지마켓','옥션','11번가','개인'];
+function channelPickerHtml(current){
+  const isPreset=CHANNELS.includes(current||'');
+  const isCustom=!!current&&!isPreset;
+  return `<select class="ch-sel" onchange="onChannelSelect(this)">
+      <option value="">— 선택 —</option>
+      ${CHANNELS.map(c=>`<option ${c===current?'selected':''}>${c}</option>`).join('')}
+      <option value="__custom__" ${isCustom?'selected':''}>직접입력</option>
+    </select>
+    <input class="ch-custom" placeholder="구매처 직접 입력" value="${isCustom?esc(current):''}" style="margin-top:6px;${isCustom?'':'display:none'}">`;
+}
+function onChannelSelect(sel){const cu=sel.parentElement.querySelector('.ch-custom');if(!cu)return;if(sel.value==='__custom__'){cu.style.display='';cu.focus();}else{cu.style.display='none';cu.value='';}}
+function channelValue(container){if(!container)return'';const sel=container.querySelector('.ch-sel');if(!sel)return'';const cu=container.querySelector('.ch-custom');return sel.value==='__custom__'?(cu?cu.value.trim():''):sel.value;}
 
 /* ---------------- DB <-> 앱 데이터 매핑 ---------------- */
 const toRow={
@@ -336,7 +349,7 @@ const fromRow={
   sales:r=>({id:r.id,customerId:r.customer_id,date:r.sold_at||'',channel:r.channel||'',product:r.product_code||'',serial:r.serial||'',qty:r.qty||1,note:r.note||'',status:r.status||'normal',statusDate:r.status_date||'',statusReason:r.status_reason||'',statusNote:r.status_note||'',reviewed:!!r.reviewed}),
   consultations:r=>({id:r.id,customerId:r.customer_id,date:r.consulted_at||'',type:r.type||'',content:r.content||'',handler:r.handler||'',followUp:r.follow_up||''}),
   as_records:r=>({id:r.id,serial:r.serial||'',customerId:r.customer_id,date:r.received_at||'',status:r.status||'',symptom:r.symptom||'',action:r.action||'',cost:r.cost||'',handler:r.handler||''}),
-  products:r=>({code:r.code,name:r.name,warrantyMonths:r.warranty_months||12})
+  products:r=>({code:r.code,name:r.name,warrantyMonths:r.warranty_months||60})
 };
 
 /* ---------------- DB 헬퍼 ---------------- */
@@ -368,7 +381,7 @@ async function loadAll(){
   STORE.consultations={};(co.data||[]).forEach(r=>STORE.consultations[r.id]=fromRow.consultations(r));
   STORE.asRecords={};(ar.data||[]).forEach(r=>STORE.asRecords[r.id]=fromRow.as_records(r));
   STORE.products=(pr.data||[]).map(fromRow.products);
-  if(!STORE.products.length)STORE.products=[{code:'CVT-100',name:'CVT-100 (삼각대)',warrantyMonths:12}];
+  if(!STORE.products.length)STORE.products=[{code:'CVT-100',name:'CVT-100 (안압계)',warrantyMonths:60}];
 }
 
 /* ---------------- 로그인 / 인증 ---------------- */
@@ -419,10 +432,10 @@ function salesOf(cid){return Object.values(STORE.sales).filter(s=>s.customerId==
 function consOf(cid){return Object.values(STORE.consultations).filter(c=>c.customerId===cid).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
 function asOf(serial){return Object.values(STORE.asRecords).filter(a=>a.serial===serial).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
 function asOfCust(cid){const ss=salesOf(cid).map(s=>s.serial);return Object.values(STORE.asRecords).filter(a=>ss.includes(a.serial));}
-function productOf(code){return STORE.products.find(p=>p.code===code)||{code,name:code,warrantyMonths:12};}
+function productOf(code){return STORE.products.find(p=>p.code===code)||{code,name:code,warrantyMonths:60};}
 function warranty(sale){
   if(!sale.date)return{state:'unknown',label:'정보없음',cls:'w-out',end:''};
-  const p=productOf(sale.product);const end=new Date(sale.date);end.setMonth(end.getMonth()+(p.warrantyMonths||12));
+  const p=productOf(sale.product);const end=new Date(sale.date);end.setMonth(end.getMonth()+(p.warrantyMonths||60));
   const now=new Date();const days=Math.ceil((end-now)/86400000);
   const endStr=end.toISOString().slice(0,10);
   if(days<0)return{state:'out',label:'보증만료',cls:'w-out',end:endStr,days};
@@ -568,7 +581,7 @@ function viewSales(){
   const topCh=Object.entries(Object.values(STORE.sales).reduce((a,s)=>{a[s.channel]=(a[s.channel]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6).map(x=>x[0]);
   return `
   <div class="page-h"><div><h1>판매 · 시리얼</h1></div><div class="desc">전체 출고 내역 — 시리얼로 즉시 조회</div>
-    <div class="right"><button class="btn" data-action="manage-products">품목 관리</button><button class="btn pri" data-action="new-sale">＋ 판매 등록</button></div></div>
+    <div class="right"><button class="btn" data-action="manage-products">제품 관리</button><button class="btn pri" data-action="new-sale">＋ 판매 등록</button></div></div>
   <div class="tablewrap">
     <div class="toolbar">
       <input class="mini-in" id="sf-q" placeholder="시리얼·고객명·연락처" style="width:230px" value="${esc(salesFilter.q)}">
@@ -826,7 +839,7 @@ function mCustomer(cust){
   const saleEditRow=(s)=>{
     const opts=STORE.products.map(p=>`<option value="${esc(p.code)}" ${s&&p.code===s.product?'selected':''}>${esc(p.name)}</option>`).join('');
     return `<div class="sale-edit" data-sid="${s?s.id:''}" style="border:1px solid var(--line);border-radius:10px;padding:12px 12px 2px;margin-bottom:10px;background:var(--card)">
-      <div class="field-row"><div class="field" style="margin-bottom:10px"><label>구매처</label><input class="se-ch" value="${s?esc(s.channel):''}" placeholder="스마트스토어"></div>
+      <div class="field-row"><div class="field se-ch-field" style="margin-bottom:10px"><label>구매처</label>${channelPickerHtml(s?s.channel:'')}</div>
         <div class="field" style="margin-bottom:10px"><label>시리얼 No.</label><input class="se-serial mono" value="${s?esc(s.serial):''}" placeholder="C-2007-0000"></div></div>
       <div class="field-row"><div class="field" style="margin-bottom:10px"><label>품목</label><select class="se-prod">${opts}</select></div>
         <div class="field" style="margin-bottom:10px"><label>출고일</label><input type="date" class="se-date" value="${s?esc(s.date):today()}"></div></div>
@@ -850,7 +863,7 @@ function mCustomer(cust){
       <div style="margin:6px -22px 0;padding:16px 22px 2px;border-top:1px solid var(--line-2);background:var(--bg)">
         <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px">첫 구매 정보 <span style="font-weight:500;color:var(--muted-2)">(선택 — 구매처·시리얼 입력 시 판매로 함께 등록)</span></div>
         <div class="field-row">
-          <div class="field"><label>구매처</label><input id="f-ch" placeholder="스마트스토어"></div>
+          <div class="field" id="ch-field-new"><label>구매처</label>${channelPickerHtml('')}</div>
           <div class="field"><label>시리얼 No.</label><input id="f-serial" class="mono" placeholder="C-2007-0000"></div>
         </div>
         <div class="field-row">
@@ -870,7 +883,7 @@ function mCustomer(cust){
       await dbUpdate('customers',c.id,STORE.customers[c.id]);
       for(const row of document.querySelectorAll('#sales-edit .sale-edit')){
         const sid=row.dataset.sid;
-        const data={channel:row.querySelector('.se-ch').value.trim(),serial:row.querySelector('.se-serial').value.trim(),product:row.querySelector('.se-prod').value,date:row.querySelector('.se-date').value,qty:+row.querySelector('.se-qty').value||1};
+        const data={channel:channelValue(row.querySelector('.se-ch-field')),serial:row.querySelector('.se-serial').value.trim(),product:row.querySelector('.se-prod').value,date:row.querySelector('.se-date').value,qty:+row.querySelector('.se-qty').value||1};
         if(sid){Object.assign(STORE.sales[sid],data);await dbUpdate('sales',sid,STORE.sales[sid]);}
         else if(data.serial||data.channel){const ns=await dbCreate('sales',{customerId:c.id,note:'',status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true,...data});STORE.sales[ns.id]=ns;}
       }
@@ -878,7 +891,7 @@ function mCustomer(cust){
     }
     const newCust=await dbCreate('customers',{name,phone:$('#f-phone').value.trim(),address:$('#f-addr').value.trim(),memo:$('#f-memo').value.trim()});
     STORE.customers[newCust.id]=newCust;
-    const serial=($('#f-serial')?.value||'').trim();const ch=($('#f-ch')?.value||'').trim();
+    const serial=($('#f-serial')?.value||'').trim();const ch=channelValue($('#ch-field-new'));
     if(serial||ch){
       const newSale=await dbCreate('sales',{customerId:newCust.id,date:$('#f-date').value,channel:ch,product:$('#f-prod').value,serial,qty:+$('#f-qty').value||1,note:'첫 구매(고객 등록 시)',status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true});
       STORE.sales[newSale.id]=newSale;
@@ -904,7 +917,7 @@ function mSale(sale,forCust){
       </div>
       <div class="field-row">
         <div class="field"><label>품목</label><select id="f-prod">${prodOpts}</select></div>
-        <div class="field"><label>구매처</label><input id="f-ch" value="${esc(s.channel)}" placeholder="스마트스토어"></div>
+        <div class="field" id="ch-field"><label>구매처</label>${channelPickerHtml(s.channel)}</div>
       </div>
       <div class="field"><label>시리얼</label><input id="f-serial" class="mono" value="${esc(s.serial)}" placeholder="C-2007-0000"></div>
       <div class="field"><label>비고</label><input id="f-note" value="${esc(s.note||'')}"></div>
@@ -912,7 +925,7 @@ function mSale(sale,forCust){
     <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
   $('#f-save').onclick=async()=>{
     const cid=forCust||$('#f-cust').value;if(!cid){toast('고객을 선택하세요');return;}
-    const data={date:$('#f-date').value,qty:+$('#f-qty').value||1,product:$('#f-prod').value,channel:$('#f-ch').value.trim(),serial:$('#f-serial').value.trim(),note:$('#f-note').value.trim(),customerId:cid};
+    const data={date:$('#f-date').value,qty:+$('#f-qty').value||1,product:$('#f-prod').value,channel:channelValue($('#ch-field')),serial:$('#f-serial').value.trim(),note:$('#f-note').value.trim(),customerId:cid};
     try{
       if(editing){Object.assign(STORE.sales[s.id],data);await dbUpdate('sales',s.id,STORE.sales[s.id]);}
       else{const ns=await dbCreate('sales',{status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true,...data});STORE.sales[ns.id]=ns;}
@@ -999,26 +1012,31 @@ function mAS(serial,cid){
   };
 }
 
+let prodDraft=null;
 function mProducts(){
   if(!canWrite()){toast('편집 권한이 없습니다');return;}
-  const rows=STORE.products.map((p,i)=>`<div class="field-row" style="grid-template-columns:1fr 1.6fr .9fr auto;align-items:end;margin-bottom:8px">
-    <div class="field" style="margin:0"><label>코드</label><input class="p-code" value="${esc(p.code)}"></div>
-    <div class="field" style="margin:0"><label>품목명</label><input class="p-name" value="${esc(p.name)}"></div>
-    <div class="field" style="margin:0"><label>보증(개월)</label><input class="p-w" type="number" value="${p.warrantyMonths||12}"></div>
+  if(!prodDraft)prodDraft=STORE.products.map(p=>({...p}));
+  const readRows=()=>{const codes=[...document.querySelectorAll('.p-code')],names=[...document.querySelectorAll('.p-name')],ws=[...document.querySelectorAll('.p-w')];return codes.map((c,i)=>({code:c.value,name:names[i].value,warrantyMonths:+ws[i].value||60}));};
+  const rows=prodDraft.map((p,i)=>`<div class="field-row" style="grid-template-columns:1fr 1.6fr .9fr auto;align-items:end;margin-bottom:8px">
+    <div class="field" style="margin:0"><label>코드</label><input class="p-code" value="${esc(p.code)}" placeholder="CVT-100"></div>
+    <div class="field" style="margin:0"><label>품목명</label><input class="p-name" value="${esc(p.name)}" placeholder="안압계"></div>
+    <div class="field" style="margin:0"><label>보증(개월)</label><input class="p-w" type="number" value="${p.warrantyMonths||60}"></div>
     <button class="btn sm danger" data-del-prod="${i}" style="margin-bottom:2px">삭제</button>
   </div>`).join('');
   openModal(`
-    <div class="mh"><h3>품목 관리</h3></div>
-    <div class="mc" id="prod-list">${rows}
-      <button class="btn sm" id="add-prod" style="margin-top:6px">＋ 품목 추가</button>
+    <div class="mh"><h3>제품(품목) 관리</h3></div>
+    <div class="mc">
+      <div class="sub-cell" style="margin-bottom:12px">여러 제품을 등록할 수 있습니다. 아래 <b>＋ 제품 추가</b>로 줄을 늘려 코드·품목명·보증기간을 입력하세요. (보증은 개월 단위 — 5년이면 60)</div>
+      <div id="prod-list">${rows}
+      <button class="btn sm" id="add-prod" style="margin-top:6px">＋ 제품 추가</button>
+      </div>
     </div>
-    <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
-  $('#add-prod').onclick=()=>{STORE.products.push({code:'',name:'',warrantyMonths:12});mProducts();};
-  $('#prod-list').addEventListener('click',e=>{const b=e.target.closest('[data-del-prod]');if(b){STORE.products.splice(+b.dataset.delProd,1);mProducts();}});
+    <div class="mf"><button class="btn" onclick="prodDraft=null;closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  $('#add-prod').onclick=()=>{prodDraft=readRows();prodDraft.push({code:'',name:'',warrantyMonths:60});mProducts();};
+  $('#prod-list').addEventListener('click',e=>{const b=e.target.closest('[data-del-prod]');if(b){prodDraft=readRows();prodDraft.splice(+b.dataset.delProd,1);mProducts();}});
   $('#f-save').onclick=async()=>{
-    const codes=[...document.querySelectorAll('.p-code')],names=[...document.querySelectorAll('.p-name')],ws=[...document.querySelectorAll('.p-w')];
-    const arr=[];codes.forEach((c,i)=>{if(c.value.trim())arr.push({code:c.value.trim(),name:names[i].value.trim()||c.value.trim(),warrantyMonths:+ws[i].value||12});});
-    if(!arr.length){toast('최소 1개 품목이 필요합니다');return;}
+    const arr=readRows().filter(p=>p.code.trim()).map(p=>({code:p.code.trim(),name:p.name.trim()||p.code.trim(),warrantyMonths:p.warrantyMonths}));
+    if(!arr.length){toast('최소 1개 제품이 필요합니다');return;}
     try{
       const oldCodes=STORE.products.map(p=>p.code).filter(Boolean);
       const {error}=await sb.from('products').upsert(arr.map(p=>({code:p.code,name:p.name,warranty_months:p.warrantyMonths})));
@@ -1026,7 +1044,7 @@ function mProducts(){
       const newCodes=arr.map(p=>p.code);
       const removed=oldCodes.filter(c=>!newCodes.includes(c));
       if(removed.length)await sb.from('products').delete().in('code',removed);
-      STORE.products=arr;closeModal();render();toast('품목이 저장되었습니다');
+      STORE.products=arr;prodDraft=null;closeModal();render();toast('제품이 저장되었습니다');
     }catch(e){toast('저장 실패');}
   };
 }
@@ -1052,7 +1070,7 @@ function exportXlsx(){
 }
 async function restoreToDB(d){
   const withId=(obj,mapper)=>Object.values(obj||{}).map(x=>({id:x.id,...mapper(x)}));
-  const prods=(d.products||[]).map(p=>({code:p.code,name:p.name,warranty_months:p.warrantyMonths||12}));
+  const prods=(d.products||[]).map(p=>({code:p.code,name:p.name,warranty_months:p.warrantyMonths||60}));
   const cust=withId(d.customers,toRow.customers);
   const sales=withId(d.sales,toRow.sales);
   const cons=withId(d.consultations,toRow.consultations);
