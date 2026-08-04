@@ -225,8 +225,25 @@ tbody tr.need:hover{background:#FBF1DC}
 #login button:disabled{opacity:.6}
 #login .err{color:var(--warn);font-size:12.5px;font-weight:600;min-height:18px;margin-bottom:8px}
 .foot .ue{color:#CFE0E2;font-weight:600;font-size:12px;word-break:break-all}
+.foot .role-badge{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--teal);color:#fff}
 .foot .logout{margin-top:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#CFE0E2;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600}
 .foot .logout:hover{background:rgba(255,255,255,.16)}
+/* 역할별 버튼 숨김 (조회자=쓰기·삭제 모두 숨김, 직원=삭제만 숨김) */
+body[data-role="viewer"] [data-action="new-customer"],
+body[data-role="viewer"] [data-action="new-sale"],
+body[data-role="viewer"] [data-action="manage-products"],
+body[data-role="viewer"] [data-edit-status],
+body[data-role="viewer"] [data-add-cons],
+body[data-role="viewer"] [data-add-sale-for],
+body[data-role="viewer"] [data-edit-cust],
+body[data-role="viewer"] [data-new-as],
+body[data-role="viewer"] [data-edit-cons],
+body[data-role="viewer"] [data-del-cons],
+body[data-role="viewer"] [data-del-as],
+body[data-role="viewer"] .rv-reason,
+body[data-role="viewer"] .rv-done{display:none!important}
+body[data-role="staff"] [data-del-cons],
+body[data-role="staff"] [data-del-as]{display:none!important}
 .hide-sm{}
 @media(max-width:920px){.hide-col{display:none}}
 </style>
@@ -261,7 +278,8 @@ tbody tr.need:hover{background:#FBF1DC}
     </nav>
     <div class="foot">
       <div class="ue" id="user-email">—</div>
-      <button class="logout" onclick="logout()">로그아웃</button>
+      <div class="role-badge" id="role-badge" style="display:none"></div>
+      <div><button class="logout" onclick="logout()">로그아웃</button></div>
     </div>
   </aside>
 
@@ -302,6 +320,9 @@ const STATUS_LABEL={normal:'정상',return_req:'반품접수',return_done:'반�
 const CONS_TYPES=['전화','문자·카톡','이메일','방문','기타'];
 const RETURN_REASONS=['단순변심','제품불량','오배송·배송문제','사용불편·미숙','사이즈·호환','고객요청 취소','기타'];
 let returnsMode='list';
+let MYROLE='staff';
+const canWrite=()=>MYROLE==='admin'||MYROLE==='staff';
+const canDelete=()=>MYROLE==='admin';
 
 /* ---------------- DB <-> 앱 데이터 매핑 ---------------- */
 const toRow={
@@ -374,7 +395,13 @@ async function submitLogin(){
 async function afterLogin(){
   $('#login').style.display='none';
   document.querySelector('.app').style.display='grid';
-  try{const {data:{user}}=await sb.auth.getUser();const ue=$('#user-email');if(ue&&user)ue.textContent=user.email;}catch(e){}
+  try{
+    const {data:{user}}=await sb.auth.getUser();
+    const ue=$('#user-email');if(ue&&user)ue.textContent=user.email;
+    if(user){const {data:prof}=await sb.from('profiles').select('role').eq('id',user.id).single();MYROLE=(prof&&prof.role)||'staff';}
+  }catch(e){MYROLE='staff';}
+  document.body.dataset.role=MYROLE;
+  const rb=$('#role-badge');if(rb){rb.style.display='inline-block';rb.textContent=({admin:'관리자',staff:'직원',viewer:'조회자'}[MYROLE]||MYROLE);}
   await loadAll();
   render();
 }
@@ -652,11 +679,11 @@ function reviewTable(list,needReview){
 function bindReturns(){
   const c=$('#app');if(!c)return;
   c.querySelectorAll('.rv-reason').forEach(sel=>sel.addEventListener('change',()=>{
-    const s=STORE.sales[sel.dataset.id];if(!s)return;s.statusReason=sel.value;if(sel.value)s.reviewed=true;dbUpdate('sales',s.id,s).catch(()=>{});
+    if(!canWrite())return;const s=STORE.sales[sel.dataset.id];if(!s)return;s.statusReason=sel.value;if(sel.value)s.reviewed=true;dbUpdate('sales',s.id,s).catch(()=>{});
     const tr=sel.closest('tr');tr.classList.toggle('need',!s.reviewed);const cb=tr.querySelector('.rv-done');if(cb)cb.checked=s.reviewed;setNavCounts();updateReviewCount();
   }));
   c.querySelectorAll('.rv-done').forEach(cb=>cb.addEventListener('change',()=>{
-    const s=STORE.sales[cb.dataset.id];if(!s)return;s.reviewed=cb.checked;dbUpdate('sales',s.id,s).catch(()=>{});
+    if(!canWrite())return;const s=STORE.sales[cb.dataset.id];if(!s)return;s.reviewed=cb.checked;dbUpdate('sales',s.id,s).catch(()=>{});
     cb.closest('tr').classList.toggle('need',!s.reviewed);setNavCounts();updateReviewCount();
   }));
 }
@@ -793,8 +820,20 @@ function openModal(html){$('#mcard').innerHTML=html;$('#modal').classList.add('s
 function closeModal(){$('#modal').classList.remove('show');}
 
 function mCustomer(cust){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   const c=cust||{name:'',phone:'',address:'',memo:''};const editing=!!cust;
   const prodOpts=STORE.products.map(p=>`<option value="${esc(p.code)}">${esc(p.name)}</option>`).join('');
+  const saleEditRow=(s)=>{
+    const opts=STORE.products.map(p=>`<option value="${esc(p.code)}" ${s&&p.code===s.product?'selected':''}>${esc(p.name)}</option>`).join('');
+    return `<div class="sale-edit" data-sid="${s?s.id:''}" style="border:1px solid var(--line);border-radius:10px;padding:12px 12px 2px;margin-bottom:10px;background:var(--card)">
+      <div class="field-row"><div class="field" style="margin-bottom:10px"><label>구매처</label><input class="se-ch" value="${s?esc(s.channel):''}" placeholder="스마트스토어"></div>
+        <div class="field" style="margin-bottom:10px"><label>시리얼 No.</label><input class="se-serial mono" value="${s?esc(s.serial):''}" placeholder="C-2007-0000"></div></div>
+      <div class="field-row"><div class="field" style="margin-bottom:10px"><label>품목</label><select class="se-prod">${opts}</select></div>
+        <div class="field" style="margin-bottom:10px"><label>출고일</label><input type="date" class="se-date" value="${s?esc(s.date):today()}"></div></div>
+      <div class="field" style="margin-bottom:10px"><label>수량</label><input type="number" min="1" class="se-qty" value="${s?(s.qty||1):1}"></div>
+    </div>`;
+  };
+  const existingSales=editing?salesOf(c.id).sort((a,b)=>(a.date||'').localeCompare(b.date||'')):[];
   openModal(`
     <div class="mh"><h3>${editing?'고객 정보 수정':'고객 등록'}</h3></div>
     <div class="mc">
@@ -802,7 +841,12 @@ function mCustomer(cust){
       <div class="field"><label>연락처</label><input id="f-phone" value="${esc(c.phone)}" placeholder="010-0000-0000"></div>
       <div class="field"><label>주소</label><input id="f-addr" value="${esc(c.address)}" placeholder="배송지 주소"></div>
       <div class="field"><label>메모</label><textarea id="f-memo" placeholder="특이사항">${esc(c.memo||'')}</textarea></div>
-      ${editing?'':`
+      ${editing?`
+      <div style="margin:6px -22px 0;padding:16px 22px 6px;border-top:1px solid var(--line-2);background:var(--bg)">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px">구매 정보 <span style="font-weight:500;color:var(--muted-2)">(각 구매 건의 구매처·시리얼 등을 수정)</span></div>
+        <div id="sales-edit">${existingSales.map(saleEditRow).join('')||'<div class="sub-cell" style="margin-bottom:10px">등록된 구매가 없습니다. 아래에서 추가할 수 있습니다.</div>'}</div>
+        <button class="btn sm" id="add-sale-row" style="margin-bottom:6px">＋ 구매 추가</button>
+      </div>`:`
       <div style="margin:6px -22px 0;padding:16px 22px 2px;border-top:1px solid var(--line-2);background:var(--bg)">
         <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px">첫 구매 정보 <span style="font-weight:500;color:var(--muted-2)">(선택 — 구매처·시리얼 입력 시 판매로 함께 등록)</span></div>
         <div class="field-row">
@@ -817,12 +861,20 @@ function mCustomer(cust){
       </div>`}
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="f-save">저장</button></div>`);
+  if(editing){const addBtn=$('#add-sale-row');if(addBtn)addBtn.onclick=()=>{const box=$('#sales-edit');const ph=box.querySelector('.sub-cell');if(ph)ph.remove();box.insertAdjacentHTML('beforeend',saleEditRow(null));};}
   $('#f-save').onclick=async()=>{
     const name=$('#f-name').value.trim();if(!name){toast('고객명을 입력하세요');return;}
     try{
     if(editing){
       Object.assign(STORE.customers[c.id],{name,phone:$('#f-phone').value.trim(),address:$('#f-addr').value.trim(),memo:$('#f-memo').value.trim()});
-      await dbUpdate('customers',c.id,STORE.customers[c.id]);closeModal();render();renderDrawer();toast('저장되었습니다');return;
+      await dbUpdate('customers',c.id,STORE.customers[c.id]);
+      for(const row of document.querySelectorAll('#sales-edit .sale-edit')){
+        const sid=row.dataset.sid;
+        const data={channel:row.querySelector('.se-ch').value.trim(),serial:row.querySelector('.se-serial').value.trim(),product:row.querySelector('.se-prod').value,date:row.querySelector('.se-date').value,qty:+row.querySelector('.se-qty').value||1};
+        if(sid){Object.assign(STORE.sales[sid],data);await dbUpdate('sales',sid,STORE.sales[sid]);}
+        else if(data.serial||data.channel){const ns=await dbCreate('sales',{customerId:c.id,note:'',status:'normal',statusDate:'',statusReason:'',statusNote:'',reviewed:true,...data});STORE.sales[ns.id]=ns;}
+      }
+      closeModal();render();renderDrawer();toast('저장되었습니다');return;
     }
     const newCust=await dbCreate('customers',{name,phone:$('#f-phone').value.trim(),address:$('#f-addr').value.trim(),memo:$('#f-memo').value.trim()});
     STORE.customers[newCust.id]=newCust;
@@ -837,6 +889,7 @@ function mCustomer(cust){
 }
 
 function mSale(sale,forCust){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   const s=sale||{date:today(),channel:'',product:STORE.products[0]?.code||'CVT-100',serial:'',qty:1,note:'',customerId:forCust||''};
   const editing=!!sale;
   const custOpts=Object.values(STORE.customers).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${c.id}" ${c.id===s.customerId?'selected':''}>${esc(c.name)} · ${esc(c.phone||'')}</option>`).join('');
@@ -869,6 +922,7 @@ function mSale(sale,forCust){
 }
 
 function mStatus(sale){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   const s=sale;
   openModal(`
     <div class="mh"><h3>반품 · 교환 상태 변경</h3></div>
@@ -891,6 +945,7 @@ function mStatus(sale){
 }
 
 function mCons(cust,cons){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   const c=cons||{type:'전화',date:today(),content:'',handler:'',followUp:''};const editing=!!cons;
   openModal(`
     <div class="mh"><h3>${editing?'상담 수정':'상담 기록'}</h3></div>
@@ -918,6 +973,7 @@ function mCons(cust,cons){
 }
 
 function mAS(serial,cid){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   openModal(`
     <div class="mh"><h3>AS 접수</h3></div>
     <div class="mc">
@@ -944,6 +1000,7 @@ function mAS(serial,cid){
 }
 
 function mProducts(){
+  if(!canWrite()){toast('편집 권한이 없습니다');return;}
   const rows=STORE.products.map((p,i)=>`<div class="field-row" style="grid-template-columns:1fr 1.6fr .9fr auto;align-items:end;margin-bottom:8px">
     <div class="field" style="margin:0"><label>코드</label><input class="p-code" value="${esc(p.code)}"></div>
     <div class="field" style="margin:0"><label>품목명</label><input class="p-name" value="${esc(p.name)}"></div>
@@ -1012,6 +1069,7 @@ function importJson(e){
   const rd=new FileReader();
   rd.onload=async()=>{
     try{
+      if(!canWrite()){toast('복원 권한이 없습니다');return;}
       const d=JSON.parse(rd.result);
       if(!d.customers||!d.sales){toast('올바른 백업 파일이 아닙니다');return;}
       if(!confirm('이 백업 파일의 내용을 클라우드 DB에 병합(같은 항목은 덮어쓰기)합니다. 계속할까요?')){e.target.value='';return;}
@@ -1078,8 +1136,8 @@ document.addEventListener('click',e=>{
   const ac=t.closest('[data-add-cons]');if(ac){mCons(STORE.customers[ac.dataset.addCons],null);return;}
   const asf=t.closest('[data-add-sale-for]');if(asf){mSale(null,asf.dataset.addSaleFor);return;}
   const edc=t.closest('[data-edit-cons]');if(edc){e.preventDefault();mCons(null,STORE.consultations[edc.dataset.editCons]);return;}
-  const dlc=t.closest('[data-del-cons]');if(dlc){e.preventDefault();if(confirm('이 상담 기록을 삭제할까요?')){const id=dlc.dataset.delCons;dbDelete('consultations',id).then(()=>{delete STORE.consultations[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
-  const dla=t.closest('[data-del-as]');if(dla){e.preventDefault();if(confirm('이 AS 기록을 삭제할까요?')){const id=dla.dataset.delAs;dbDelete('as_records',id).then(()=>{delete STORE.asRecords[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
+  const dlc=t.closest('[data-del-cons]');if(dlc){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 상담 기록을 삭제할까요?')){const id=dlc.dataset.delCons;dbDelete('consultations',id).then(()=>{delete STORE.consultations[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
+  const dla=t.closest('[data-del-as]');if(dla){e.preventDefault();if(!canDelete()){toast('삭제 권한이 없습니다');return;}if(confirm('이 AS 기록을 삭제할까요?')){const id=dla.dataset.delAs;dbDelete('as_records',id).then(()=>{delete STORE.asRecords[id];renderDrawer();render();toast('삭제되었습니다');}).catch(()=>{});}return;}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer();gr.style.display='none';}
   if((e.key==='/'||(e.metaKey&&e.key==='k'))&&document.activeElement!==gs){e.preventDefault();gs.focus();}});
