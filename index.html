@@ -775,6 +775,7 @@ function renderDrawer(){
         <button class="btn sm" data-edit-cust="${c.id}">정보 수정</button>
         <button class="btn sm pri" data-add-cons="${c.id}">＋ 상담 기록</button>
         <button class="btn sm" data-add-sale-for="${c.id}">＋ 판매 추가</button>
+        <button class="btn sm" data-send-guide="${c.id}" style="background:var(--ok);border-color:var(--ok);color:#fff">문자 발송 (사용 안내)</button>
       </div>
     </div>
     <div class="dtabs">
@@ -1151,6 +1152,7 @@ document.addEventListener('click',e=>{
     return;}
   const es=t.closest('[data-edit-status]');if(es){e.stopPropagation();mStatus(STORE.sales[es.dataset.editStatus]);return;}
   const na=t.closest('[data-new-as]');if(na){const[serial,cid]=na.dataset.newAs.split('|');mAS(serial,cid);return;}
+  const sg=t.closest('[data-send-guide]');if(sg){sendGuideSms(STORE.customers[sg.dataset.sendGuide],sg);return;}
   const ec=t.closest('[data-edit-cust]');if(ec){mCustomer(STORE.customers[ec.dataset.editCust]);return;}
   const ac=t.closest('[data-add-cons]');if(ac){mCons(STORE.customers[ac.dataset.addCons],null);return;}
   const asf=t.closest('[data-add-sale-for]');if(asf){mSale(null,asf.dataset.addSaleFor);return;}
@@ -1163,6 +1165,26 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer();gr.style.display='none';}
   if((e.key==='/'||(e.metaKey&&e.key==='k'))&&document.activeElement!==gs){e.preventDefault();gs.focus();}});
+
+
+/* ---------------- 토노아이 사용 안내 문자 발송 (Supabase send-sms → Coolsms) ---------------- */
+const SMS_FN_URL='https://rioyawvqrnztithmctvl.supabase.co/functions/v1/send-sms';
+async function sendGuideSms(c,btn){
+  if(!c){toast('고객 정보를 찾을 수 없습니다');return;}
+  const phone=(c.phone||'').trim();
+  if(!phone){toast('등록된 연락처가 없습니다');return;}
+  if(!confirm(`${c.name||''} (${phone}) 고객에게 토노아이 사용 안내 문자를 발송할까요?`))return;
+  const old=btn.textContent;btn.disabled=true;btn.textContent='발송 중...';
+  try{
+    const {data}=await sb.auth.getSession();const tk=data&&data.session&&data.session.access_token;
+    if(!tk){alert('로그인이 필요합니다. 다시 로그인해주세요.');return;}
+    const r=await fetch(SMS_FN_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({to:phone})});
+    const j=await r.json().catch(()=>({}));
+    if(j.success){alert(`문자 발송 완료\n수신: ${c.name||''} ${phone}`);toast('사용 안내 문자를 발송했습니다');}
+    else{alert('문자 발송 실패\n'+(j.error||('오류 코드 '+r.status)));}
+  }catch(e){alert('문자 발송 실패\n'+e.message);}
+  finally{btn.disabled=false;btn.textContent=old;}
+}
 
 boot();
 </script>
