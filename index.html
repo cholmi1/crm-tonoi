@@ -1166,5 +1166,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeD
 
 boot();
 </script>
-</body>
+<script>
+async function sendCVT100Sms(phoneNumber){const functionUrl='https://rioyawvqrnztithmctvl.supabase.co/functions/v1/send-sms';try{const sms_resp=await fetch(functionUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phoneNumber})});const sms_result=await sms_resp.json();if(sms_result.success){alert(`✅ SMS 발송 완료!\n수신자: ${phoneNumber}`);return true;}else{alert(`❌ SMS 발송 실패\n오류: ${sms_result.error}`);return false;}}catch(error){alert(`❌ 오류: ${error.message}`);return false;}}
+function addSMSButton(){const drawer=document.getElementById('drawer');if(!drawer||document.getElementById('sms-send-btn-github'))return;let phoneNumber='';const phoneElements=drawer.querySelectorAll('*');for(let el of phoneElements){const text=(el.textContent||'').trim();if(text.match(/^010-\d{4}-\d{4}$/)||text.match(/^0\d{1,2}-\d{3,4}-\d{4}$/)){phoneNumber=text;break;}}if(!phoneNumber)return;const btn=document.createElement('button');btn.id='sms-send-btn-github';btn.textContent='📱 SMS 발송 (CVT100 사용 안내)';btn.style.cssText='width:100%;height:42px;background:linear-gradient(135deg, #0E7C86 0%, #0B6670 100%);color:white;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;margin-top:16px;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(14, 124, 134, 0.2);';btn.onmouseover=function(){this.style.background='linear-gradient(135deg, #0B6670 0%, #094C55 100%)';this.style.transform='translateY(-2px)';};btn.onmouseout=function(){this.style.background='linear-gradient(135deg, #0E7C86 0%, #0B6670 100%)';this.style.transform='translateY(0)';};btn.onclick=function(){if(confirm(`${phoneNumber}로 CVT100 사용 안내 SMS를 발송하시겠습니까?`)){sendCVT100Sms(phoneNumber);}};drawer.appendChild(btn);}
+const originalDrawerOpen=window.openDrawer;if(originalDrawerOpen){window.openDrawer=function(...args){const result=originalDrawerOpen.apply(this,args);setTimeout(addSMSButton,100);return result;};}
+const drawer=document.getElementById('drawer');if(drawer){const observer=new MutationObserver(()=>{setTimeout(addSMSButton,100);});observer.observe(drawer,{childList:true,subtree:true});}
+</script></body>
 </html>
