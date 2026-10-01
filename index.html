@@ -240,6 +240,7 @@ body[data-role="viewer"] [data-new-as],
 body[data-role="viewer"] [data-edit-cons],
 body[data-role="viewer"] [data-del-cons],
 body[data-role="viewer"] [data-del-as],
+body[data-role="viewer"] [data-send-guide],
 body[data-role="viewer"] .rv-reason,
 body[data-role="viewer"] .rv-done{display:none!important}
 body[data-role="staff"] [data-del-cons],
@@ -1152,7 +1153,7 @@ document.addEventListener('click',e=>{
     return;}
   const es=t.closest('[data-edit-status]');if(es){e.stopPropagation();mStatus(STORE.sales[es.dataset.editStatus]);return;}
   const na=t.closest('[data-new-as]');if(na){const[serial,cid]=na.dataset.newAs.split('|');mAS(serial,cid);return;}
-  const sg=t.closest('[data-send-guide]');if(sg){sendGuideSms(STORE.customers[sg.dataset.sendGuide],sg);return;}
+  const sg=t.closest('[data-send-guide]');if(sg){sendGuideSms(STORE.customers[sg.dataset.sendGuide]);return;}
   const ec=t.closest('[data-edit-cust]');if(ec){mCustomer(STORE.customers[ec.dataset.editCust]);return;}
   const ac=t.closest('[data-add-cons]');if(ac){mCons(STORE.customers[ac.dataset.addCons],null);return;}
   const asf=t.closest('[data-add-sale-for]');if(asf){mSale(null,asf.dataset.addSaleFor);return;}
@@ -1169,21 +1170,45 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeD
 
 /* ---------------- 토노아이 사용 안내 문자 발송 (Supabase send-sms → Coolsms) ---------------- */
 const SMS_FN_URL='https://rioyawvqrnztithmctvl.supabase.co/functions/v1/send-sms';
-async function sendGuideSms(c,btn){
+function storedAccessToken(){
+  try{for(const k of Object.keys(localStorage)){if(/^sb-.*-auth-token$/.test(k)){const v=JSON.parse(localStorage.getItem(k));const t=v&&(v.access_token||(v.currentSession&&v.currentSession.access_token));if(t)return t;}}}catch(e){}
+  return null;
+}
+async function getAccessToken(){
+  try{
+    const r=await Promise.race([sb.auth.getSession(),new Promise(res=>setTimeout(()=>res(null),4000))]);
+    const t=r&&r.data&&r.data.session&&r.data.session.access_token;
+    if(t)return t;
+  }catch(e){}
+  return storedAccessToken();
+}
+function sendGuideSms(c){
   if(!c){toast('고객 정보를 찾을 수 없습니다');return;}
   const phone=(c.phone||'').trim();
   if(!phone){toast('등록된 연락처가 없습니다');return;}
-  if(!confirm(`${c.name||''} (${phone}) 고객에게 토노아이 사용 안내 문자를 발송할까요?`))return;
-  const old=btn.textContent;btn.disabled=true;btn.textContent='발송 중...';
-  try{
-    const {data}=await sb.auth.getSession();const tk=data&&data.session&&data.session.access_token;
-    if(!tk){alert('로그인이 필요합니다. 다시 로그인해주세요.');return;}
-    const r=await fetch(SMS_FN_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({to:phone})});
-    const j=await r.json().catch(()=>({}));
-    if(j.success){alert(`문자 발송 완료\n수신: ${c.name||''} ${phone}`);toast('사용 안내 문자를 발송했습니다');}
-    else{alert('문자 발송 실패\n'+(j.error||('오류 코드 '+r.status)));}
-  }catch(e){alert('문자 발송 실패\n'+e.message);}
-  finally{btn.disabled=false;btn.textContent=old;}
+  openModal(`<div class="mh"><h3>사용 안내 문자 발송</h3></div>
+    <div class="mc"><div class="sub-cell" id="sg-msg"><b>${esc(c.name||'')}</b> (${esc(phone)}) 고객에게 토노아이 사용 안내 문자를 발송할까요?</div></div>
+    <div class="mf" id="sg-foot"><button class="btn" id="sg-cancel">취소</button><button class="btn pri" id="sg-ok">발송</button></div>`);
+  $('#sg-cancel').onclick=closeModal;
+  $('#sg-ok').onclick=async()=>{
+    const ok=$('#sg-ok');ok.disabled=true;ok.textContent='발송 중...';$('#sg-cancel').disabled=true;
+    let html;
+    try{
+      const tk=await getAccessToken();
+      if(!tk)throw new Error('로그인 정보가 없습니다. 로그아웃 후 다시 로그인해주세요.');
+      const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),20000);
+      const r=await fetch(SMS_FN_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk},body:JSON.stringify({to:phone}),signal:ac.signal});
+      clearTimeout(tm);
+      const j=await r.json().catch(()=>({}));
+      if(!j.success)throw new Error(j.error||('오류 코드 '+r.status));
+      html=`<b style="color:var(--ok)">발송 완료</b><br>${esc(c.name||'')} ${esc(phone)} 고객에게 사용 안내 문자를 보냈습니다.`;
+      toast('사용 안내 문자를 발송했습니다');
+    }catch(e){
+      html=`<b style="color:var(--warn)">발송 실패</b><br>${esc(e&&e.name==='AbortError'?'서버 응답 시간 초과':(e&&e.message)||'알 수 없는 오류')}`;
+    }
+    $('#sg-msg').innerHTML=html;
+    $('#sg-foot').innerHTML='<button class="btn pri" onclick="closeModal()">닫기</button>';
+  };
 }
 
 boot();
